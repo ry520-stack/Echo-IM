@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+*, *::before, *::after {
+  transition: background-color .7s ease-in-out, border-color .7s ease-in-out, color .5s ease-in-out;
+}
+
+html, body, #root {
+  transition: background-color .7s ease-in-out, color .5s ease-in-out;
+}
+
+html, body, #root {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.app-boot-fallback {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: #ffffff;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-boot-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 16px 36px rgba(99, 102, 241, 0.22);
+}
+
+.app-boot-text {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.app-boot-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+/* 禁止浏览器原生长按菜单（图片/视频/表情） */
+img, video, [style*="background-image"] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: auto;
+}
+
+.app-no-callout,
+.app-no-callout * {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.message-media,
+.message-media * {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation;
+}
+
+.message-media img,
+.message-media video {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+/* Message bubble animation */
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg-in {
+  animation: msgIn 0.2s ease-out;
+}
+
+/* Global: kill yellow/blue focus rings, use bottom-border highlight instead */
+input:focus,
+textarea:focus,
+select:focus,
+button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Subtle bottom-border focus highlight */
+.input-focus-line {
+  position: relative;
+}
+.input-focus-line::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  border-radius: 1px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.input-focus-line:focus-within::after {
+  left: 0;
+  right: 0;
+}
+
+/* Gravity Zone breathing animation */
+@keyframes gravityBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.08); opacity: 0.5; }
+}
+.animate-gravity-breathe {
+  animation: gravityBreathe 3s ease-in-out infinite;
+}
+
+/* Disable native touch callout on interactive cards */
+.touch-callout-none {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Safe area fallback for notched devices */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

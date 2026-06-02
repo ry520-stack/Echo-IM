@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+build/
+backend/dist/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+certs/
+*.keystore
+*.jks
+
+# Runtime data
+uploads/
+backend/uploads/
+frontend/uploads/
+*.db
+*.db-journal
+
+# Archives and local packages
+*.tar
+*.tar.gz
+*.zip
+unpackage/
+Echo-HBX-5Plus/
+
+# Debug and temporary workspaces
+audit-debug/
+audit-debug-2/
+audit-new/
+avatar-bg-debug/
+chat-full-debug/
+chat-input-debug/
+echo-chat-src/
+echo-gpt-context/
+echo-gpt-review/
+friend-debug/
+hbx-compat-debug/
+latest-debug/
+message-backend-debug/
+message-sending-debug/
+read-receipt-components/
+voice-call-components/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+  "name": "Echo IM",
+  "short_name": "Echo",
+  "description": "面向移动端体验的即时通讯项目",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

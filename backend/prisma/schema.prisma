@@ -1,0 +1,444 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  username            String   @unique
+  email               String   @unique
+  password            String
+  digitalId           Int      @unique
+  avatar              String   @default("")
+  nickname            String   @default("")
+  status              String   @default("")
+  autoReply           String   @default("")
+  allowStrangerMessage  Boolean  @default(true)
+  readReceiptsEnabled   Boolean  @default(true)
+  callRingtoneUrl       String   @default("")
+  callRingtoneMode      String   @default("peer")
+  lastSeenAt           DateTime @default(now())
+  bgConversation       String   @default("")
+  bgGravity            String   @default("")
+  bgChat               String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  sentMessages     Message[]       @relation("SentMessages")
+  receivedMessages Message[]       @relation("ReceivedMessages")
+  friendships      Friend[]        @relation("UserFriendships")
+  friendOf         Friend[]        @relation("FriendOf")
+  groupMemberships GroupMember[]
+  createdGroups    GroupChat[]
+  readReceipts     ReadReceipt[]
+  emojis           Emoji[]
+  moments          Moment[]
+  momentLikes      MomentLike[]
+  momentComments   MomentComment[]
+  blockedUsers       BlockList[]        @relation("BlockerRelation")
+  blockedBy          BlockList[]        @relation("BlockedRelation")
+  createdGroupZones  FriendGroup[]      @relation("GroupOwner")
+  assignedGroupZones FriendGroupMember[] @relation("GroupPeer")
+  momentPermissions  MomentPermission[]
+  hiddenMessages     MessageHidden[]
+  userConversationClears UserConversationClear[]
+  groupConversationClears GroupConversationClear[]
+  pushDevices        PushDevice[]
+}
+
+model PushDevice {
+  id        String   @id @default(uuid())
+  userId    String
+  clientId  String   @unique
+  platform  String   @default("android")
+  appId     String   @default("")
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Friend {
+  id        String    @id @default(uuid())
+  userId    String
+  friendId  String
+  alias     String    @default("")
+  status    String    @default("pending")
+  isPinned  Boolean   @default(false)
+  chatBackground String @default("")
+  chatBackgroundUser String @default("")
+  chatBackgroundFriend String @default("")
+  muted     Boolean   @default(false)
+  hidden    Boolean   @default(false)
+  displayGroupId String?
+  realMetAt DateTime?
+  deletedBy String?
+  deletedAt DateTime?
+  blockedBy String?
+  blockedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user   User @relation("UserFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friend User @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+}
+
+model GroupChat {
+  id        String   @id @default(uuid())
+  name      String
+  avatar    String?
+  notice    String?
+  creatorId String
+  createdAt DateTime @default(now())
+
+  creator User          @relation(fields: [creatorId], references: [id])
+  members GroupMember[]
+  messages Message[]
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  groupId  String
+  userId   String
+  role     String   @default("member")
+  alias    String?
+  remark   String?
+  joinedAt DateTime @default(now())
+
+  group GroupChat @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String?
+  groupId    String?
+  content    String
+  type       String   @default("text")
+  isRecalled Boolean  @default(false)
+  replyToId  String?
+  createdAt  DateTime @default(now())
+
+  sender   User       @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User?      @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: SetNull)
+  group    GroupChat? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  replyTo  Message?   @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies  Message[]  @relation("ReplyTo")
+  readReceipts  ReadReceipt[]
+  hiddenBy      MessageHidden[]
+
+  @@index([senderId, receiverId])
+  @@index([groupId])
+  @@index([createdAt])
+  @@index([senderId, receiverId, createdAt])
+}
+
+model ReadReceipt {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+}
+
+model Emoji {
+  id        String   @id @default(uuid())
+  userId    String
+  imageUrl  String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PetBond {
+  id            String   @id @default(uuid())
+  userAId       String
+  userBId       String
+  requestedBy   String
+  status        String   @default("pending")
+  name          String   @default("Echo")
+  avatar        String   @default("")
+  level         Int      @default(1)
+  experience    Int      @default(0)
+  intimacy      Int      @default(0)
+  coins         Int      @default(20)
+  biscuits      Int      @default(1)
+  activity      String   @default("idle")
+  activityUntil DateTime?
+  skin          String   @default("classic")
+  lastCheckInDay String  @default("")
+  repairCards   Int      @default(1)
+  repairedDays  String   @default("[]")
+  lastSpokeAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model CoupleBond {
+  id           String    @id @default(uuid())
+  userAId      String
+  userBId      String
+  requestedBy  String
+  status       String    @default("pending")
+  metAt        DateTime?
+  datingAt     DateTime?
+  countdownAt  DateTime?
+  countdownTitle String  @default("")
+  userACityCode String   @default("")
+  userACityName String   @default("")
+  userBCityCode String   @default("")
+  userBCityName String   @default("")
+  userALat      Float?
+  userALng      Float?
+  userBLat      Float?
+  userBLng      Float?
+  userAPeriodStart DateTime?
+  userACycleLength Int   @default(28)
+  userAPeriodLength Int  @default(5)
+  userAShareCycle Boolean @default(false)
+  userBPeriodStart DateTime?
+  userBCycleLength Int   @default(28)
+  userBPeriodLength Int  @default(5)
+  userBShareCycle Boolean @default(false)
+  bondedAt     DateTime?
+  lastSosAt    DateTime?
+  lastSosBy    String    @default("")
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
+}
+
+model CoupleContract {
+  id         String   @id @default(uuid())
+  coupleId   String
+  createdBy  String
+  title      String
+  content    String   @default("")
+  deadline   DateTime?
+  penalty    String   @default("")
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([coupleId, status, createdAt])
+}
+
+model CoupleItem {
+  id        String   @id @default(uuid())
+  coupleId  String
+  createdBy String
+  type      String
+  title     String   @default("")
+  content   String   @default("")
+  images    String   @default("[]")
+  cityName  String   @default("")
+  happenedAt DateTime?
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coupleId, type, createdAt])
+}
+
+model Moment {
+  id           String             @id @default(uuid())
+  userId       String
+  content      String
+  images       String             @default("[]")
+  privacyType  String             @default("PUBLIC")
+  galleryMode  String             @default("stack")
+  coverIndex   Int                @default(0)
+  createdAt    DateTime           @default(now())
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes        MomentLike[]
+  comments     MomentComment[]
+  permissions  MomentPermission[]
+
+  @@index([userId, createdAt])
+}
+
+model MomentPermission {
+  id       String        @id @default(uuid())
+  momentId String
+  groupId  String?
+  userId   String?
+  mode     String        @default("ALLOW")
+
+  moment   Moment        @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  group    FriendGroup?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([momentId])
+}
+
+model FriendGroup {
+  id          String             @id @default(uuid())
+  userId      String
+  name        String
+  color       String             @default("#6366f1")
+  createdAt   DateTime           @default(now())
+
+  owner       User               @relation("GroupOwner", fields: [userId], references: [id], onDelete: Cascade)
+  members     FriendGroupMember[]
+  permissions MomentPermission[]
+
+  @@unique([userId, name])
+}
+
+model FriendGroupMember {
+  groupId String
+  peerId  String
+
+  group   FriendGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  peer    User        @relation("GroupPeer", fields: [peerId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, peerId])
+}
+
+model MomentLike {
+  id        String   @id @default(uuid())
+  momentId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([momentId, userId])
+}
+
+model MomentComment {
+  id        String   @id @default(uuid())
+  momentId  String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  moment Moment @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([momentId])
+}
+
+model VerificationCode {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
+}
+
+model DelayedMessage {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String?
+  groupId    String?
+  content    String
+  type       String   @default("text")
+  sendAt     DateTime
+  cancelled  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId])
+  @@index([sendAt])
+}
+
+model Captcha {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  answer    Int
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model BlockList {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("BlockerRelation", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedRelation", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model MessageHidden {
+  id        String   @id @default(uuid())
+  userId    String
+  messageId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId])
+  @@index([userId])
+  @@index([messageId])
+}
+
+model UserConversationClear {
+  id        String   @id @default(uuid())
+  userId    String
+  peerId    String
+  clearedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, peerId])
+  @@index([userId])
+  @@index([peerId])
+}
+
+model GroupConversationClear {
+  id        String   @id @default(uuid())
+  userId    String
+  groupId   String
+  clearedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+}

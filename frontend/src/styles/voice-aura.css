@@ -1,0 +1,133 @@
+.mic-aura-container {
+  position: absolute;
+  width: 224px;
+  height: 224px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.voice-replica-card.listening .mic-aura-container {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.mic-aura-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 3px 0 white,
+    inset 60px 40px 30px -40px rgba(106, 76, 172, 0.15),
+    20px 20px 70px -5px rgb(150, 166, 197),
+    -50px -50px 70px 20px rgba(255, 255, 255, 0.7),
+    inset 0 0 30px 0 white;
+  background: hsla(0, 0%, 70%, 0.1);
+  animation: circle1 4.2s ease-in-out infinite 0.3s;
+}
+
+.mic-aura-ring::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  width: 30%;
+  height: 30%;
+  background: #ff0073;
+  top: 30%;
+  right: 30%;
+}
+
+.mic-aura-ring::before {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  width: 30%;
+  height: 30%;
+  background: #00baff;
+  bottom: 10%;
+  left: 30%;
+}
+
+/* Inner rotating gradient ring */
+.mic-aura-glow {
+  position: absolute;
+  width: 123px;
+  height: 123px;
+  border-radius: 50%;
+  background-color: white;
+  pointer-events: none;
+  animation: circle2 4.2s ease-in-out infinite;
+}
+
+.mic-aura-glow-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 25px 10px rgba(255, 255, 255, 0.8),
+    0 0 10px 10px rgba(255, 255, 255, 0.9);
+  background-color: #9292d8;
+  animation: bgRotate 2.5s linear infinite;
+}
+
+.mic-aura-glow-inner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  animation: bg 4s linear infinite;
+  border-radius: inherit;
+  box-shadow: inset 0 0 25px 10px rgba(255, 255, 255, 0.8);
+  opacity: 0.2;
+}
+
+/* Cancel state — pause + dim */
+.voice-replica-card.cancel-state .mic-aura-ring,
+.voice-replica-card.cancel-state .mic-aura-glow,
+.voice-replica-card.cancel-state .mic-aura-glow-inner,
+.voice-replica-card.cancel-state .mic-aura-glow-inner::before {
+  animation-play-state: paused;
+  opacity: 0.3;
+  filter: grayscale(0.5);
+}
+
+@keyframes circle1 {
+  0% { transform: scale(0.97); }
+  15% { transform: scale(1); }
+  30% { transform: scale(0.98); }
+  45% { transform: scale(1); }
+  60% { transform: scale(0.97); }
+  85% { transform: scale(1); }
+  100% { transform: scale(0.97); }
+}
+
+@keyframes circle2 {
+  0% { transform: scale(1); }
+  15% { transform: scale(1.03); }
+  30% { transform: scale(0.98); }
+  45% { transform: scale(1.04); }
+  60% { transform: scale(0.97); }
+  85% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes bgRotate {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(90deg); }
+  40% { transform: rotate(180deg) scale(0.95, 1); }
+  60%, 100% { transform: rotate(360deg); }
+}
+
+@keyframes bg {
+  20% { background-color: #ff0073; }
+  40% { background-color: #5eff7e; }
+  60% { background-color: #2cb5ff; }
+  80% { background-color: #fc63ff; }
+}

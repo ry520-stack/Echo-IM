@@ -1,0 +1,83 @@
+version: '3.9'
+
+# ============================================================
+# Echo IM 生产环境 Docker Compose
+#
+# HTTPS/WSS 配置指南：
+# 1. 申请域名 + SSL 证书（推荐 Let's Encrypt / 阿里云免费证书）
+# 2. 在 Nginx 中配置反向代理：
+#    - https://你的域名        → frontend:80
+#    - https://你的域名/api/   → backend:3001
+#    - https://你的域名/socket.io/ → backend:3001 (WebSocket upgrade)
+# 3. Socket.IO 客户端连接地址改为 wss://你的域名
+# 4. 5+ App manifest.json 中的 server URL 也要改为 https://你的域名
+# ============================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-echo_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-echo_pass}
+      POSTGRES_DB: ${DB_NAME:-echo_db}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-echo_user} -d ${DB_NAME:-echo_db}']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis（可选，用于 Socket.IO 多实例扩展 / 离线消息队列）
+  # 当前单实例不需要，取消注释即可启用
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - '6379:6379'
+  #   volumes:
+  #     - redisdata:/data
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - '9090:3001'
+    volumes:
+      - uploads:/app/uploads
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-echo_user}:${DB_PASSWORD:-echo_pass}@db:5432/${DB_NAME:-echo_db}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      QQ_SMTP_USER: ${QQ_SMTP_USER}
+      QQ_SMTP_PASS: ${QQ_SMTP_PASS}
+      UNIPUSH_WEBHOOK_URL: ${UNIPUSH_WEBHOOK_URL}
+      UNIPUSH_WEBHOOK_SECRET: ${UNIPUSH_WEBHOOK_SECRET}
+      OFFLINE_PUSH_ENABLED: ${OFFLINE_PUSH_ENABLED:-false}
+      AMAP_WEB_SERVICE_KEY: ${AMAP_WEB_SERVICE_KEY}
+      PORT: '3001'
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      # 如启用 Redis，取消下面的注释：
+      # REDIS_URL: redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  uploads:
+  # redisdata:

@@ -1,0 +1,24 @@
+import { Router } from 'express';
+import { authenticate } from '../middlewares/auth.middleware';
+import * as controller from '../controllers/couple.controller';
+
+const router = Router();
+router.use(authenticate);
+router.get('/', controller.getSummary);
+router.post('/request', controller.requestBond);
+router.post('/respond', controller.respond);
+router.patch('/', controller.updateSettings);
+router.post('/sos', controller.sendSos);
+router.post('/unbind', controller.unbind);
+router.post('/force-unbind', controller.forceUnbind);
+router.get('/items', controller.getItems);
+router.post('/items', controller.createItem);
+router.delete('/items/:id', controller.archiveItem);
+router.patch('/cycle', controller.updateCycle);
+router.get('/contracts', controller.getContracts);
+router.post('/contracts', controller.createContract);
+router.patch('/contracts/:id', controller.updateContract);
+router.get('/weekly-report', controller.getWeeklyReport);
+router.get('/activity-config', controller.getActivityConfig);
+router.patch('/pet-skin', controller.updatePetSkin);
+export default router;
