@@ -513,8 +513,6 @@ export async function markAllRead(userId: string, peerId?: string, groupId?: str
     where: { id: userId },
     select: { readReceiptsEnabled: true },
   });
-  if (me?.readReceiptsEnabled === false) return 0;
-
   if (groupId) {
     const member = await prisma.groupMember.findUnique({
       where: { groupId_userId: { groupId, userId } },
@@ -571,7 +569,7 @@ export async function markAllRead(userId: string, peerId?: string, groupId?: str
   );
 
   const io = getIO();
-  if (io) {
+  if (io && me?.readReceiptsEnabled !== false) {
     io.to(`user:${peerId}`).emit('read:update_batch', {
       messageIds: unreadMessages.map(m => m.id),
       readBy: userId,

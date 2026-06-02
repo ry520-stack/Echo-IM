@@ -27,7 +27,7 @@ function previewMessage(type: string, content: string) {
     try {
       const event = JSON.parse(content)?.event;
       if (event === 'requested') return '[\u5171\u540c\u5ba0\u7269] \u5171\u540c\u9886\u517b\u9080\u8bf7';
-      if (event === 'accepted') return '[\u5171\u540c\u5ba0\u7269] \u5df2\u540c\u610f\u5171\u540c\u9886\u517b';
+      if (event === 'accepted' || event === 'adopted') return '[\u5171\u540c\u5ba0\u7269] \u5df2\u540c\u610f\u5171\u540c\u9886\u517b';
       if (event === 'rejected') return '[\u5171\u540c\u5ba0\u7269] \u5df2\u62d2\u7edd\u5171\u540c\u9886\u517b';
     } catch { /* fall through */ }
     return '[\u5171\u540c\u5ba0\u7269]';
@@ -275,6 +275,9 @@ export function initSocket(httpServer: HttpServer) {
       if (!perm.ok || !perm.isFriend) {
         return ack?.({ ok: false, code: perm.code || 'FRIEND_REQUIRED', message: perm.message || '只有好友才能语音通话' });
       }
+      if (!isUserOnline(data.receiverId)) {
+        return ack?.({ ok: false, code: 'OFFLINE', message: '\u5bf9\u65b9\u5f53\u524d\u4e0d\u5728\u7ebf' });
+      }
       const [caller, receiver] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { callRingtoneUrl: true, callRingtoneMode: true } }),
         prisma.user.findUnique({ where: { id: data.receiverId }, select: { callRingtoneUrl: true } }),
@@ -309,9 +312,9 @@ export function initSocket(httpServer: HttpServer) {
       if (ok) socket.to(`user:${data.targetId}`).emit('call:accepted');
     });
 
-    socket.on('call:reject', async (data: { targetId: string }) => {
+    socket.on('call:reject', async (data: { targetId: string; reason?: 'busy' }) => {
       const ok = await canInteractWithUser(userId, data.targetId);
-      if (ok) socket.to(`user:${data.targetId}`).emit('call:rejected');
+      if (ok) socket.to(`user:${data.targetId}`).emit('call:rejected', { reason: data.reason });
     });
 
     socket.on('call:hangup', async (data: { targetId: string }) => {
@@ -332,8 +335,6 @@ export function initSocket(httpServer: HttpServer) {
           where: { id: userId },
           select: { readReceiptsEnabled: true },
         });
-        if (me?.readReceiptsEnabled === false) return;
-
         // 校验消息确实属于当前用户（receiverId === userId）
         const msg = await prisma.message.findUnique({
           where: { id: data.messageId },
@@ -346,7 +347,7 @@ export function initSocket(httpServer: HttpServer) {
           create: { messageId: data.messageId, userId },
           update: { readAt: new Date() },
         });
-        if (msg.senderId) {
+        if (msg.senderId && me?.readReceiptsEnabled !== false) {
           socket.to(`user:${msg.senderId}`).emit('read:update', {
             messageId: data.messageId, readBy: userId, readAt: receipt.readAt,
           });
@@ -359,6 +360,7 @@ export function initSocket(httpServer: HttpServer) {
       if (idx !== -1) {
         onlineUsers.splice(idx, 1);
         io?.emit('online:update', { userId, online: false });
+        prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }).catch(() => {});
       }
     });
   });

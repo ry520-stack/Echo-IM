@@ -441,11 +441,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     setLiveGroupAvatar(groupAvatar || '');
   }, [groupAvatar, groupName]);
 
-  const readReceiptKey = `echo-read-${peerId}`;
   const [readReceiptOn, setReadReceiptOn] = useState(() => {
     const global = localStorage.getItem('echo-read-receipt-global');
-    const perChat = localStorage.getItem(readReceiptKey);
-    if (perChat !== null) return perChat === 'true';
     if (global !== null) return global === 'true';
     return true;
   });
@@ -504,7 +501,6 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   const toggleReadReceipt = () => {
     const next = !readReceiptOn;
     setReadReceiptOn(next);
-    localStorage.setItem(readReceiptKey, String(next));
     localStorage.setItem('echo-read-receipt-global', String(next));
     api('PUT', '/api/users/me', { readReceiptsEnabled: next }).catch(() => {});
   };

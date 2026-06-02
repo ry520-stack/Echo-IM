@@ -305,7 +305,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (!socket) return;
 
     const onInvite = (data: { senderId: string; callerName: string; callerAvatar: string; receiverRingtoneUrl?: string; callerRingtoneUrl?: string }) => {
-      if (callStatusRef.current !== 'idle') return; // busy
+      if (callStatusRef.current !== 'idle') {
+        socket.emit('call:reject', { targetId: data.senderId, reason: 'busy' });
+        return;
+      }
       setPeerId(data.senderId);
       setCallerName(data.callerName || '\u672a\u77e5');
       setCallerAvatar(data.callerAvatar || '');
@@ -327,7 +330,10 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const onRejected = () => { toast('对方已拒绝', 'info'); cleanup(); };
+    const onRejected = (data?: { reason?: string }) => {
+      toast(data?.reason === 'busy' ? '对方正在通话中' : '对方已拒绝', 'info');
+      cleanup();
+    };
     const onHangedup = () => { cleanup(); };
 
     const onSignal = async (data: { senderId: string; signal: any }) => {
