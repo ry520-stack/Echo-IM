@@ -11,7 +11,7 @@ import { api } from '../api/client';
 
 interface Peer {
   id: string; username: string; nickname: string; avatar: string;
-  digitalId: number; lastSeenAt: string; status: string;
+  digitalId: number; lastSeenAt: string; status: string; presence?: 'online' | 'busy' | 'away' | 'dnd';
   allowStrangerMessage?: boolean;
 }
 interface GroupInfo {

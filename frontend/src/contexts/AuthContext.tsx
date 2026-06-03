@@ -9,6 +9,7 @@ interface User {
   nickname: string;
   avatar: string;
   status: string;
+  presence?: 'online' | 'busy' | 'away' | 'dnd';
   allowStrangerMessage: boolean;
   callRingtoneUrl?: string;
   callRingtoneMode?: 'peer' | 'mine';

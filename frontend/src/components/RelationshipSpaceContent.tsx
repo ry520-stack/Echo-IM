@@ -87,6 +87,11 @@ function countdown(value?: string) {
   return hours >= 0 ? `${Math.floor(hours / 24)} 天 ${hours % 24} 小时` : '已到达';
 }
 
+function songUrl(item: CoupleItem) {
+  const values = [item.content, item.title];
+  return values.find(value => /^https?:\/\//i.test(value.trim()))?.trim() || '';
+}
+
 function WeatherCard({ title, city, weather }: { title: string; city?: string; weather?: Weather | null }) {
   return (
     <div className="rounded-2xl bg-white/70 p-3 shadow-sm backdrop-blur dark:bg-gray-900/70">
@@ -300,13 +305,13 @@ export default function RelationshipSpaceContent() {
             {itemForm.images.length > 0 && <div className="flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
             <input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={module === 'song' ? '歌曲名或链接' : module === 'footprint' ? '城市或旅行名称' : '标题'} className="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             {module === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder="去过的城市" className="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}
-            <textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={module === 'praise' ? '写一句想夸对方的话' : module === 'grudge' ? '记录这件事，之后可以归档' : '备注'} className="min-h-20 w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+            <textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={module === 'song' ? '填写可播放的音频链接或歌曲备注' : module === 'praise' ? '写一句想夸对方的话' : module === 'grudge' ? '记录这件事，之后可以归档' : '备注'} className="min-h-20 w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             {(module === 'photo' || module === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}
             <button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-xl bg-rose-500 py-2.5 text-sm font-semibold text-white disabled:opacity-40">保存</button>
             <div className="space-y-2">
               {visibleItems.map(item => <div key={item.id} className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                 {(() => { try { const images = JSON.parse(item.images) as string[]; return images.length ? <div className="mb-2 flex gap-2 overflow-x-auto">{images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-20 w-20 rounded-lg object-cover" />)}</div> : null; } catch { return null; } })()}
-                <div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.title || item.cityName || '未命名记录'}</p><p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>{item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}</div><button onClick={() => archiveItem(item.id)} className="shrink-0 text-gray-300 hover:text-red-400"><Trash2 size={15} /></button></div>
+                <div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.title || item.cityName || '未命名记录'}</p><p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>{module === 'song' && songUrl(item) && <audio className="mt-2 h-9 w-full" controls preload="none" src={songUrl(item)} />}{item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}</div><button onClick={() => archiveItem(item.id)} className="shrink-0 text-gray-300 hover:text-red-400"><Trash2 size={15} /></button></div>
               </div>)}
               {visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">还没有记录</p>}
             </div>

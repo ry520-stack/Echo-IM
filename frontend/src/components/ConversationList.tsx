@@ -10,7 +10,7 @@ import { messagePreview } from '../utils/messagePreview';
 
 interface Peer {
   id: string; username: string; nickname: string; avatar: string;
-  digitalId: number; lastSeenAt: string; status: string; alias: string;
+  digitalId: number; lastSeenAt: string; status: string; presence?: 'online' | 'busy' | 'away' | 'dnd'; alias: string;
   isGroup?: boolean; memberCount?: number;
 }
 interface LastMessage { id: string; content: string; type: string; createdAt: string; senderId: string; }
@@ -231,17 +231,20 @@ export default function ConversationList({ searchText, searchTab }: { searchText
     socket.on('group:updated', fetchConversations);
     socket.on('relationship:updated', fetchConversations);
     socket.on('friend:removed', fetchConversations);
+    socket.on('user:updated', fetchConversations);
     return () => {
       socket.off('message:receive', handleMessage);
       socket.off('group:updated', fetchConversations);
       socket.off('relationship:updated', fetchConversations);
       socket.off('friend:removed', fetchConversations);
+      socket.off('user:updated', fetchConversations);
     };
   }, [socket, user?.id, chatId, fetchConversations]);
 
   const getDisplayName = (peer: Peer) => peer.alias || peer.nickname || peer.username;
+  const getPresenceText = (peer: Peer) => peer.presence === 'busy' ? '忙碌' : peer.presence === 'away' ? '离开' : peer.presence === 'dnd' ? '请勿打扰' : '在线';
   const getLastSeenText = (peer: Peer) => {
-    if (onlineUsers.has(peer.id)) return '在线';
+    if (onlineUsers.has(peer.id)) return getPresenceText(peer);
     if (!peer.lastSeenAt) return '';
     const diff = Date.now() - new Date(peer.lastSeenAt).getTime();
     const minutes = Math.floor(diff / 60000);
@@ -263,8 +266,8 @@ export default function ConversationList({ searchText, searchTab }: { searchText
 
   return (
     <div className={`relative flex h-full flex-col overflow-hidden ${hasBg ? '' : 'bg-white dark:bg-gray-950'}`}>
-      {hasBg && <div className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0" style={{ backgroundImage: `url(${assetUrl(bgUrl)})` }} />}
-      {hasBg && <div className="absolute inset-0 bg-black/30 dark:bg-black/50 z-[1]" />}
+      {hasBg && <div className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0" style={{ backgroundImage: `url(${assetUrl(bgUrl)})`, imageRendering: 'auto' }} />}
+      {hasBg && <div className="absolute inset-0 bg-white/5 dark:bg-black/20 z-[1]" />}
 
       {/* 连接状态 */}
       {!connected && (
@@ -349,7 +352,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                       onTouchEnd={(e) => handleTouchEnd(e, conv.peer.id)}
                       onTouchCancel={handleTouchCancel}
                       style={{ touchAction: 'pan-y', ...(isSwiping ? { transform: `translateX(${swipeX}px)`, transition: 'none' } : { transform: 'translateX(0)', transition: 'transform 0.3s ease' }) }}
-                  className={`relative flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors select-none ${hasBg ? `backdrop-blur-md ${isActive ? 'bg-white/70 dark:bg-white/10' : 'bg-white/40 hover:bg-white/60 dark:bg-white/5 dark:hover:bg-white/10'} border-b border-white/10 dark:border-white/5` : `hover:bg-gray-100 dark:hover:bg-gray-800/50 ${isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`} ${isPinned ? `border-l-2 ${accentBorderClass[accentColor] || accentBorderClass.purple}` : ''}`}
+                  className={`relative flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors select-none ${hasBg ? `backdrop-blur-[2px] ${isActive ? 'bg-white/52 dark:bg-black/28' : 'bg-white/22 hover:bg-white/38 dark:bg-black/14 dark:hover:bg-black/24'} border-b border-white/10 dark:border-white/5` : `hover:bg-gray-100 dark:hover:bg-gray-800/50 ${isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`} ${isPinned ? `border-l-2 ${accentBorderClass[accentColor] || accentBorderClass.purple}` : ''}`}
                     >
                       <div className="relative shrink-0">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-lg font-bold text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">

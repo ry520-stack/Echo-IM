@@ -14,6 +14,7 @@ interface Peer {
   digitalId: number;
   lastSeenAt: string;
   status: string;
+  presence?: 'online' | 'busy' | 'away' | 'dnd';
 }
 
 interface Friend {

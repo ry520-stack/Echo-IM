@@ -5,12 +5,16 @@ import {
   Bell,
   ChevronRight,
   Clock3,
+  Coffee,
   Heart,
   LogOut,
   MessageCircle,
+  Moon,
   Orbit,
   Settings,
+  Shield,
   Sparkles,
+  Sun,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -48,6 +52,7 @@ export default function SidebarDrawer({ open, onClose }: Props) {
   const location = useLocation();
   const [editingStatus, setEditingStatus] = useState(false);
   const [statusText, setStatusText] = useState(user?.status || '');
+  const [presence, setPresence] = useState(user?.presence || 'online');
   const [unreadMoments, setUnreadMoments] = useState(() => localStorage.getItem('echo-moments-has-unread') === 'true');
   const [unreadFriends, setUnreadFriends] = useState(false);
   const [coupleStatus, setCoupleStatus] = useState<'none' | 'pending' | 'active'>('none');
@@ -68,6 +73,16 @@ export default function SidebarDrawer({ open, onClose }: Props) {
       updateUser({ status: statusText });
     } catch {
       setStatusText(user?.status || '');
+    }
+  };
+
+  const savePresence = async (next: 'online' | 'busy' | 'away' | 'dnd') => {
+    setPresence(next);
+    try {
+      await api('PUT', '/api/users/me', { presence: next });
+      updateUser({ presence: next });
+    } catch {
+      setPresence(user?.presence || 'online');
     }
   };
 
@@ -172,15 +187,15 @@ export default function SidebarDrawer({ open, onClose }: Props) {
       <AnimatePresence>
         {open && (
           <motion.aside
-            className="fixed inset-y-0 left-0 z-50 flex w-[82vw] max-w-[320px] flex-col border-r border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950"
+            className="fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[340px] flex-col overflow-hidden border-r border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-950"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', stiffness: 220, damping: 26 }}
           >
             <div className="flex min-h-0 flex-1 flex-col">
-              <section className="px-5 pb-5 pt-6">
-                <div className="mb-5 flex items-center gap-3">
+              <section className="bg-gradient-to-br from-primary-50 via-white to-violet-50 px-5 pb-4 pt-6 dark:from-primary-950/30 dark:via-gray-950 dark:to-violet-950/20">
+                <div className="mb-3 flex items-center gap-3">
                   <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-primary-500 text-white shadow-lg shadow-primary-500/20">
                     {user?.avatar ? (
                       <img src={assetUrl(user.avatar)} alt="" className="h-full w-full object-cover" />
@@ -189,7 +204,7 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                         {(user?.nickname || user?.username || 'E')[0]?.toUpperCase()}
                       </div>
                     )}
-                    <span className="absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-gray-950" />
+                    <span className={`absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-white dark:border-gray-950 ${presence === 'online' ? 'bg-emerald-500' : presence === 'busy' ? 'bg-rose-500' : presence === 'away' ? 'bg-amber-400' : 'bg-slate-400'}`} />
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -220,14 +235,26 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                     <span className="truncate">{user?.status || '设置个性签名...'}</span>
                   </button>
                 )}
+                <div className="mt-3 grid grid-cols-4 gap-1 rounded-2xl bg-white/80 p-1 shadow-sm dark:bg-gray-900/70">
+                  {([
+                    ['online', '在线', Sun],
+                    ['busy', '忙碌', Coffee],
+                    ['away', '离开', Moon],
+                    ['dnd', '勿扰', Shield],
+                  ] as const).map(([key, label, Icon]) => (
+                    <button key={key} type="button" onClick={() => savePresence(key)} className={`flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] transition-colors ${presence === key ? 'bg-primary-500 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                      <Icon size={13} />{label}
+                    </button>
+                  ))}
+                </div>
               </section>
 
-              <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-5">
+              <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
                 <button
                   onClick={() => { setUnreadCouple(false); navigate('/?space=relationship'); }}
-                  className="mb-4 flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-50 to-fuchsia-50 px-3 py-3 text-left shadow-sm transition-transform active:scale-[0.98] dark:border-rose-900/40 dark:from-rose-950/35 dark:to-fuchsia-950/25"
+                  className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-rose-100 bg-gradient-to-r from-rose-50 to-fuchsia-50 px-3 py-2.5 text-left shadow-sm transition-transform active:scale-[0.98] dark:border-rose-900/40 dark:from-rose-950/35 dark:to-fuchsia-950/25"
                 >
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-md shadow-rose-500/20"><Heart size={21} /></span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md shadow-rose-500/20"><Heart size={19} /></span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-200">关系空间{unreadCouple && <span className="h-2 w-2 rounded-full bg-red-500" />}</span>
                     <span className="mt-0.5 block truncate text-xs text-rose-400">{coupleStatus === 'active' ? '纪念日、天气、宠物与双人回忆' : coupleStatus === 'pending' ? '有一条情侣绑定申请待处理' : '邀请情侣开启双人空间'}</span>
@@ -235,15 +262,15 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                   <ChevronRight size={16} className="text-rose-300" />
                 </button>
 
-                {navSections.map(section => <section key={section.label} className="mb-4">
+                {navSections.map(section => <section key={section.label} className="mb-3">
                   <p className="mb-1 px-3 text-[11px] font-semibold tracking-widest text-gray-300 dark:text-gray-600">{section.label}</p>
                   <div className="space-y-1">{section.items.map(({ title, subtitle, path, Icon, accent, unread, beforeNavigate }) => (
                   <button
                     key={path}
                     onClick={() => navigate(path, beforeNavigate)}
-                    className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900 ${location.pathname === path ? 'bg-gray-50 dark:bg-gray-900' : ''}`}
+                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-900 ${location.pathname === path ? 'bg-gray-50 dark:bg-gray-900' : ''}`}
                   >
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${accent}`}>
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${accent}`}>
                       <Icon size={20} />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -259,15 +286,15 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                 </section>)}
               </nav>
 
-              <footer className="border-t border-gray-100 px-3 py-4 dark:border-gray-800">
-                <div className="mb-3 flex items-center justify-between rounded-2xl bg-gray-50 px-3 py-3 dark:bg-gray-900">
+              <footer className="shrink-0 border-t border-gray-100 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-950">
+                <div className="flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2 dark:bg-gray-900">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-200">外观</span>
                   <GooeyToggle isDark={theme === 'dark'} onToggle={toggleTheme} />
                 </div>
 
                 <button
                   onClick={() => navigate('/settings')}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-900"
+                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-900"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500 dark:bg-gray-900 dark:text-gray-400">
                     <Settings size={18} />
@@ -278,7 +305,7 @@ export default function SidebarDrawer({ open, onClose }: Props) {
 
                 <button
                   onClick={() => { logout(); nav('/login'); }}
-                  className="mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
                 >
                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-50 text-red-500 dark:bg-red-950/30">
                     <LogOut size={18} />
@@ -286,10 +313,6 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                   <span className="flex-1">退出登录</span>
                 </button>
 
-                <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-300">
-                  <MessageCircle size={13} />
-                  <span>Echo</span>
-                </div>
               </footer>
             </div>
           </motion.aside>

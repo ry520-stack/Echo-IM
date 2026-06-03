@@ -14,8 +14,10 @@ export default function NotificationProvider({ children }: { children: React.Rea
   useEffect(() => {
     if (!socket) return;
     const onSos = (data: { message?: string }) => toast(data.message || '对方想你了', 'info');
+    const onWeeklyReport = (data: { message?: string }) => toast(data.message || '你们的新一周关系周报已生成', 'info');
     socket.on('couple:sos', onSos);
-    return () => { socket.off('couple:sos', onSos); };
+    socket.on('couple:weekly-report', onWeeklyReport);
+    return () => { socket.off('couple:sos', onSos); socket.off('couple:weekly-report', onWeeklyReport); };
   }, [socket, toast]);
 
   return (

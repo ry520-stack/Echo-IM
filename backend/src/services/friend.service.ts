@@ -79,8 +79,8 @@ export async function getFriends(userId: string) {
       ],
     },
     include: {
-      user: { select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true } },
-      friend: { select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true } },
+      user: { select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true, presence: true } },
+      friend: { select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true, presence: true } },
     },
     orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
   });

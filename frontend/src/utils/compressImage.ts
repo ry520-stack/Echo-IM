@@ -29,6 +29,12 @@ export async function prepareMomentImage(file: File): Promise<File> {
   return compressImage(file, 12);
 }
 
+export async function prepareBackgroundImage(file: File): Promise<File> {
+  if (file.type === 'image/gif') return file;
+  if (file.size <= 28 * 1024 * 1024) return file;
+  return compressImage(file, 15);
+}
+
 // 表情包专用压缩（画质优先），返回 [file, compressed]
 export async function compressEmoji(file: File): Promise<[File, boolean]> {
   if (file.type === 'image/gif') return [file, true];

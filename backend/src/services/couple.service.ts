@@ -1,10 +1,12 @@
 import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
+import { pushToUsers } from './push.service';
 
 const SOS_COOLDOWN_MS = 30 * 60 * 1000;
 const UNBIND_LOCK_MS = 90 * 24 * 60 * 60 * 1000;
 const WEATHER_CACHE_MS = 30 * 60 * 1000;
 const weatherCache = new Map<string, { expiresAt: number; value: any }>();
+let lastWeeklyReportKey = '';
 const ITEM_TYPES = ['photo', 'footprint', 'song', 'praise', 'grudge'];
 const PET_SKINS = [
   { key: 'classic', name: '经典伙伴', limited: false },
@@ -15,6 +17,14 @@ const EVENTS = [
   { key: 'starlight-week', title: '星光陪伴周', description: '连续互动可解锁限定宠物装扮。', endsAt: '2026-12-31T23:59:59+08:00' },
   { key: 'summer-memories', title: '夏日回忆季', description: '记录共同足迹和照片，收藏这个夏天。', endsAt: '2026-08-31T23:59:59+08:00' },
 ];
+
+function skinAccess(pet: { level: number; intimacy: number } | null, skin: string) {
+  if (skin === 'classic') return { unlocked: true, requirement: '默认装扮' };
+  if (!pet) return { unlocked: false, requirement: '请先领养共同宠物' };
+  if (skin === 'starlight') return { unlocked: pet.level >= 6 && pet.intimacy >= 15, requirement: '宠物达到 6 级且亲密度达到 15' };
+  if (skin === 'summer') return { unlocked: pet.level >= 3 && Date.now() <= new Date('2026-08-31T23:59:59+08:00').getTime(), requirement: '活动期间宠物达到 3 级' };
+  return { unlocked: false, requirement: '未开放' };
+}
 
 function pair(userId: string, peerId: string) {
   return userId < peerId ? [userId, peerId] : [peerId, userId];
@@ -354,8 +364,9 @@ export async function getWeeklyReport(userId: string) {
 }
 
 export async function getActivityConfig(userId: string) {
-  await requireActive(userId);
-  return { events: EVENTS, skins: PET_SKINS };
+  const bond = await requireActive(userId);
+  const pet = await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId: bond.userAId, userBId: bond.userBId } }, select: { level: true, intimacy: true } });
+  return { events: EVENTS, skins: PET_SKINS.map(item => ({ ...item, ...skinAccess(pet, item.key) })) };
 }
 
 export async function updatePetSkin(userId: string, skin: string) {
@@ -363,9 +374,31 @@ export async function updatePetSkin(userId: string, skin: string) {
   if (!PET_SKINS.some(item => item.key === skin)) throw new Error('宠物皮肤无效');
   const pet = await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId: bond.userAId, userBId: bond.userBId } } });
   if (!pet || pet.status !== 'active') throw new Error('请先领养共同宠物');
+  const access = skinAccess(pet, skin);
+  if (!access.unlocked) throw new Error(access.requirement);
   const updated = await prisma.petBond.update({ where: { id: pet.id }, data: { skin } });
   notify(bond);
   getIO()?.to(`user:${bond.userAId}`).emit('pet:updated', { peerId: bond.userBId, action: 'skin-updated' });
   getIO()?.to(`user:${bond.userBId}`).emit('pet:updated', { peerId: bond.userAId, action: 'skin-updated' });
   return updated;
+}
+
+async function sendWeeklyReportReminders() {
+  const chinaNow = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  if (chinaNow.getUTCDay() !== 1 || chinaNow.getUTCHours() !== 9) return;
+  const weekKey = chinaNow.toISOString().slice(0, 10);
+  if (lastWeeklyReportKey === weekKey) return;
+  lastWeeklyReportKey = weekKey;
+  const bonds = await prisma.coupleBond.findMany({ where: { status: 'active' }, select: { userAId: true, userBId: true } });
+  for (const bond of bonds) {
+    const userIds = [bond.userAId, bond.userBId];
+    getIO()?.to(`user:${bond.userAId}`).emit('couple:weekly-report', { message: '你们的新一周关系周报已生成' });
+    getIO()?.to(`user:${bond.userBId}`).emit('couple:weekly-report', { message: '你们的新一周关系周报已生成' });
+    pushToUsers({ userIds, title: 'Echo 关系空间', body: '你们的新一周关系周报已生成', payload: { type: 'couple-weekly-report' } }).catch(() => {});
+  }
+}
+
+export function startWeeklyReportScheduler() {
+  sendWeeklyReportReminders().catch(() => {});
+  setInterval(() => sendWeeklyReportReminders().catch(() => {}), 30 * 60 * 1000);
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, Clock, Send, Smile, Trash2, PawPrint, Camera, Cookie, Backpack, Store, Heart } from 'lucide-react';
+import { Image, Clock, Send, Smile, Trash2, PawPrint, Camera, Cookie, Backpack, Store, Heart, Gamepad2, Pill, Ticket } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useToast } from '../contexts/ToastContext';
@@ -57,6 +57,7 @@ interface Peer {
   digitalId: number;
   lastSeenAt: string;
   status: string;
+  presence?: 'online' | 'busy' | 'away' | 'dnd';
   allowStrangerMessage?: boolean;
   readReceiptsEnabled?: boolean;
 }
@@ -84,6 +85,8 @@ interface PetBond {
   intimacy: number;
   coins?: number;
   biscuits?: number;
+  toys?: number;
+  medicines?: number;
   activity?: 'idle' | 'sleep' | 'study' | 'work';
   activityUntil?: string | null;
   skin?: 'classic' | 'starlight' | 'summer';
@@ -245,7 +248,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     }
   };
 
-  const runPetAction = async (action: 'check-in' | 'buy-biscuit' | 'feed' | 'study' | 'work' | 'sleep') => {
+  const runPetAction = async (action: 'check-in' | 'buy-biscuit' | 'buy-toy' | 'buy-medicine' | 'buy-repair-card' | 'feed' | 'play' | 'heal' | 'study' | 'work' | 'sleep') => {
     setPetBusy(true);
     try {
       const next = await api<PetBond>('POST', `/api/pets/${realPeerId}/action`, { action });
@@ -1433,13 +1436,13 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       {/* Chat background layer with GPU acceleration */}
       {effectiveBg && (
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-45 z-0"
-          style={{ backgroundImage: `url(${assetUrl(effectiveBg)})`, willChange: 'transform', transform: 'translateZ(0)' }}
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90 z-0"
+          style={{ backgroundImage: `url(${assetUrl(effectiveBg)})`, willChange: 'transform', transform: 'translateZ(0)', imageRendering: 'auto' }}
         />
       )}
 
       {/* Header — mobile back button, partner info, no palette */}
-      <header className="flex items-center gap-3 border-b border-gray-100 px-3 py-2.5 dark:border-gray-800 relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shrink-0">
+      <header className="flex items-center gap-3 border-b border-white/30 px-3 py-2.5 dark:border-gray-800/50 relative z-10 bg-white/68 dark:bg-gray-900/68 backdrop-blur-sm shrink-0">
         {onBack && (
           <button onClick={onBack} className="rounded-xl p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 shrink-0">
             ←
@@ -1458,7 +1461,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <p className="text-sm text-gray-500">
             {isGroup ? `${groupMemberCount} 人 · 查看群资料` :
              typingUser ? <span className="text-primary-500">正在输入...</span> :
-             isUserOnline(peerId) ? <span className="text-green-500">在线</span> : '离线'}
+             isUserOnline(peerId) ? <span className="text-green-500">{peer?.presence === 'busy' ? '忙碌' : peer?.presence === 'away' ? '离开' : peer?.presence === 'dnd' ? '请勿打扰' : '在线'}</span> : '离线'}
           </p>
         </button>
         {!isGroup && pet?.status !== 'active' && (
@@ -1524,7 +1527,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                     </div>
                     <div className="min-w-0 max-w-[80%]">
                       <p className="mb-0.5 ml-1 text-[10px] text-amber-500">{pet?.name || 'Echo Pet'}</p>
-                      <div className="rounded-2xl rounded-bl-md bg-white/95 px-3.5 py-2 text-sm text-gray-800 shadow-sm ring-1 ring-black/[0.03] dark:bg-gray-800/95 dark:text-gray-200 dark:ring-white/[0.04]">
+                      <div className="rounded-2xl rounded-bl-md bg-white/82 px-3.5 py-2 text-sm text-gray-800 shadow-sm ring-1 ring-black/[0.03] backdrop-blur-[2px] dark:bg-gray-800/78 dark:text-gray-200 dark:ring-white/[0.04]">
                         {msg.content}
                       </div>
                     </div>
@@ -1621,7 +1624,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                             ? 'dm-collapse rounded-2xl px-3.5 py-2'
                             : isMine
                               ? `${isMediaMessage ? 'rounded-[18px] p-1' : 'rounded-2xl rounded-br-md px-3.5 py-2'} bg-primary-500 text-white shadow-primary-500/10`
-                              : `${isMediaMessage ? 'rounded-[18px] p-1' : 'rounded-2xl rounded-bl-md px-3.5 py-2'} bg-white/95 text-gray-800 ring-1 ring-black/[0.03] dark:bg-gray-800/95 dark:text-gray-200 dark:ring-white/[0.04]`
+                              : `${isMediaMessage ? 'rounded-[18px] p-1' : 'rounded-2xl rounded-bl-md px-3.5 py-2'} bg-white/82 text-gray-800 ring-1 ring-black/[0.03] backdrop-blur-[2px] dark:bg-gray-800/78 dark:text-gray-200 dark:ring-white/[0.04]`
                         }`}
                         onContextMenu={(e) => e.preventDefault()}
                         onTouchStart={(e) => {
@@ -1947,7 +1950,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       <motion.form layout onSubmit={sendMessage} transition={{ type: 'spring', stiffness: 200, damping: 25 }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
-        className="relative flex w-full min-w-0 items-end gap-2 border-t border-gray-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-900/90 group/input"
+        className="relative flex w-full min-w-0 items-end gap-2 border-t border-white/30 bg-white/78 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)] backdrop-blur-lg dark:border-zinc-800/70 dark:bg-zinc-900/78 group/input"
         style={{ minHeight: '62px', paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Toggle button */}
         <button
@@ -2146,19 +2149,43 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
             </div>
             {petTab === 'shop' ? (
               <div className="space-y-2">
-                <p className="text-xs text-gray-400">宠物商店将用于限时皮肤和互动道具。当前先开放体验道具。</p>
+                <p className="text-xs text-gray-400">金币由签到、共同任务和工作获得。购买后会进入双方共享背包。</p>
                 <div className="flex items-center justify-between rounded-xl bg-amber-50 p-3 dark:bg-amber-950/20">
-                  <div><p className="font-semibold text-amber-700 dark:text-amber-300">饼干试吃装</p><p className="text-[11px] text-amber-500">免费体验 · 触发双方同步动画</p></div>
+                  <div><p className="font-semibold text-amber-700 dark:text-amber-300">营养饼干</p><p className="text-[11px] text-amber-500">喂食后增加亲密度</p></div>
                   <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-biscuit')} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">5 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-violet-50 p-3 dark:bg-violet-950/20">
+                  <div><p className="font-semibold text-violet-700 dark:text-violet-300">互动玩具</p><p className="text-[11px] text-violet-500">玩耍后增加 3 点亲密度</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-toy')} className="rounded-lg bg-violet-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">12 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/20">
+                  <div><p className="font-semibold text-emerald-700 dark:text-emerald-300">宠物药品</p><p className="text-[11px] text-emerald-500">恢复生病或低落状态</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-medicine')} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">15 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-sky-50 p-3 dark:bg-sky-950/20">
+                  <div><p className="font-semibold text-sky-700 dark:text-sky-300">补签卡</p><p className="text-[11px] text-sky-500">仅修复最近一次中断中的一天</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-repair-card')} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">25 金币购买</button>
                 </div>
               </div>
             ) : petTab === 'bag' ? (
               <div className="space-y-2">
-                <p className="text-xs text-gray-400">体验道具会触发双方同步互动。后续可继续扩展共享库存。</p>
+                <p className="text-xs text-gray-400">背包数据双方完全共享，任何一方使用后都会同步更新。</p>
                 <button type="button" disabled={petBusy || !pet.biscuits} onClick={() => runPetAction('feed')} className="flex w-full items-center justify-between rounded-xl bg-amber-50 p-3 text-left disabled:opacity-50 dark:bg-amber-950/20">
                   <span className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-300"><Cookie size={16} /> 饼干</span>
                   <span className="text-xs text-amber-500">{`${pet.biscuits || 0} 个 · 喂给宠物`}</span>
                 </button>
+                <button type="button" disabled={petBusy || !pet.toys} onClick={() => runPetAction('play')} className="flex w-full items-center justify-between rounded-xl bg-violet-50 p-3 text-left disabled:opacity-50 dark:bg-violet-950/20">
+                  <span className="flex items-center gap-2 font-semibold text-violet-700 dark:text-violet-300"><Gamepad2 size={16} /> 互动玩具</span>
+                  <span className="text-xs text-violet-500">{`${pet.toys || 0} 个 · 陪宠物玩耍`}</span>
+                </button>
+                <button type="button" disabled={petBusy || !pet.medicines} onClick={() => runPetAction('heal')} className="flex w-full items-center justify-between rounded-xl bg-emerald-50 p-3 text-left disabled:opacity-50 dark:bg-emerald-950/20">
+                  <span className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300"><Pill size={16} /> 宠物药品</span>
+                  <span className="text-xs text-emerald-500">{`${pet.medicines || 0} 份 · 恢复状态`}</span>
+                </button>
+                <div className="flex w-full items-center justify-between rounded-xl bg-sky-50 p-3 text-left dark:bg-sky-950/20">
+                  <span className="flex items-center gap-2 font-semibold text-sky-700 dark:text-sky-300"><Ticket size={16} /> 补签卡</span>
+                  <span className="text-xs text-sky-500">{`${pet.repairCards || 0} 张`}</span>
+                </div>
                 <button type="button" onClick={() => interactWithPet('poke')} className="flex w-full items-center justify-between rounded-xl bg-violet-50 p-3 text-left dark:bg-violet-950/20">
                   <span className="font-semibold text-violet-700 dark:text-violet-300">互动玩具</span>
                   <span className="text-xs text-violet-500">戳一戳</span>

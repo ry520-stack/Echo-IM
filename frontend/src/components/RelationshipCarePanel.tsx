@@ -12,7 +12,7 @@ interface Report {
 }
 interface Config {
   events: Array<{ key: string; title: string; description: string; endsAt: string }>;
-  skins: Array<{ key: string; name: string; limited: boolean }>;
+  skins: Array<{ key: string; name: string; limited: boolean; unlocked: boolean; requirement: string }>;
 }
 interface Cycle {
   periodStart?: string; cycleLength?: number; periodLength?: number; shareWithPartner?: boolean;
@@ -92,7 +92,7 @@ export default function RelationshipCarePanel({ myCycle, peerCycle, currentSkin,
     {tab === 'event' && <div className="space-y-3">
       {config.events.map(event => <div key={event.key} className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/20"><p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{event.title}</p><p className="mt-1 text-xs text-gray-500">{event.description}</p><p className="mt-1 text-[11px] text-gray-400">截止：{new Date(event.endsAt).toLocaleDateString()}</p></div>)}
       <p className="pt-1 text-xs font-semibold text-gray-500">宠物装扮</p>
-      <div className="grid grid-cols-2 gap-2">{config.skins.map(skin => <button key={skin.key} disabled={busy} onClick={() => run(() => api('PATCH', '/api/couples/pet-skin', { skin: skin.key }), '宠物装扮已切换')} className={`rounded-xl border px-3 py-3 text-left text-xs ${currentSkin === skin.key ? 'border-violet-500 bg-violet-50 text-violet-600 dark:bg-violet-950/25' : 'border-gray-100 text-gray-500 dark:border-gray-800'}`}>{skin.name}{skin.limited && <span className="ml-1 text-amber-500">限定</span>}</button>)}</div>
+      <div className="grid grid-cols-2 gap-2">{config.skins.map(skin => <button key={skin.key} disabled={busy || !skin.unlocked} onClick={() => run(() => api('PATCH', '/api/couples/pet-skin', { skin: skin.key }), '宠物装扮已切换')} className={`rounded-xl border px-3 py-3 text-left text-xs disabled:opacity-50 ${currentSkin === skin.key ? 'border-violet-500 bg-violet-50 text-violet-600 dark:bg-violet-950/25' : 'border-gray-100 text-gray-500 dark:border-gray-800'}`}>{skin.name}{skin.limited && <span className="ml-1 text-amber-500">限定</span>}<span className="mt-1 block text-[10px] text-gray-400">{skin.unlocked ? '已解锁' : skin.requirement}</span></button>)}</div>
     </div>}
   </section>;
 }

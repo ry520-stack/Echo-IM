@@ -245,10 +245,40 @@ export async function petAction(userId: string, peerId: string, action?: string)
     notifyPetUpdated(userId, peerId, 'bought-biscuit');
     return getPet(userId, peerId);
   }
+  if (action === 'buy-toy') {
+    if (existing.coins < 12) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 12 }, toys: { increment: 1 } } });
+    notifyPetUpdated(userId, peerId, 'bought-toy');
+    return getPet(userId, peerId);
+  }
+  if (action === 'buy-medicine') {
+    if (existing.coins < 15) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 15 }, medicines: { increment: 1 } } });
+    notifyPetUpdated(userId, peerId, 'bought-medicine');
+    return getPet(userId, peerId);
+  }
+  if (action === 'buy-repair-card') {
+    if (existing.coins < 25) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 25 }, repairCards: { increment: 1 } } });
+    notifyPetUpdated(userId, peerId, 'bought-repair-card');
+    return getPet(userId, peerId);
+  }
   if (action === 'feed') {
     if (existing.biscuits < 1) throw new Error('背包里没有饼干');
     await prisma.petBond.update({ where: { id: existing.id }, data: { biscuits: { decrement: 1 }, intimacy: { increment: 1 } } });
     notifyPetUpdated(userId, peerId, 'fed');
+    return getPet(userId, peerId);
+  }
+  if (action === 'play') {
+    if (existing.toys < 1) throw new Error('背包里没有玩具');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { toys: { decrement: 1 }, intimacy: { increment: 3 } } });
+    notifyPetUpdated(userId, peerId, 'played');
+    return getPet(userId, peerId);
+  }
+  if (action === 'heal') {
+    if (existing.medicines < 1) throw new Error('背包里没有药品');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { medicines: { decrement: 1 }, lastSpokeAt: new Date() } });
+    notifyPetUpdated(userId, peerId, 'healed');
     return getPet(userId, peerId);
   }
   if (existing.activityUntil && existing.activityUntil > now) throw new Error('宠物正在忙，稍后再试');

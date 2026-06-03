@@ -187,7 +187,7 @@ export async function getConversations(userId: string) {
     const [peers, friendRecords, allUserClears] = await Promise.all([
       prisma.user.findMany({
         where: { id: { in: peerIds } },
-        select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true },
+        select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, lastSeenAt: true, status: true, presence: true },
       }),
       prisma.friend.findMany({
         where: {

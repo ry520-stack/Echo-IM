@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { api, getServerUrl } from '../api/client';
-import { compressImage } from '../utils/compressImage';
+import { prepareBackgroundImage } from '../utils/compressImage';
 
 export type PageKey = 'conversation' | 'gravity' | 'chat';
 const STORAGE_KEY = 'echo-backgrounds';
@@ -76,7 +76,7 @@ export function useBackground() {
   }, [settings]);
 
   const uploadAndGetUrl = async (file: File): Promise<string> => {
-    const compressed = await compressImage(file, 8);
+    const compressed = await prepareBackgroundImage(file);
     const base = getServerUrl();
     const token = localStorage.getItem('echo-token');
     const formData = new FormData();

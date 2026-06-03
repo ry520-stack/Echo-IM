@@ -2,6 +2,40 @@ import prisma from '../utils/prisma';
 
 const MAX_MOMENT_IMAGES = 18;
 
+async function acceptedFriendIds(userId: string) {
+  const friendships = await prisma.friend.findMany({
+    where: { OR: [{ userId }, { friendId: userId }], status: 'accepted' },
+    select: { userId: true, friendId: true },
+  });
+  return friendships.map(friend => friend.userId === userId ? friend.friendId : friend.userId);
+}
+
+async function canViewMoment(momentId: string, viewerId: string) {
+  const moment = await prisma.moment.findUnique({
+    where: { id: momentId },
+    include: { permissions: true },
+  });
+  if (!moment) throw new Error('动态不存在');
+  if (moment.userId === viewerId) return moment;
+
+  const friendIds = await acceptedFriendIds(viewerId);
+  if (!friendIds.includes(moment.userId)) throw new Error('无权查看该动态');
+
+  const memberships = await prisma.friendGroupMember.findMany({
+    where: { peerId: viewerId },
+    select: { groupId: true },
+  });
+  const groupIds = new Set(memberships.map(item => item.groupId));
+  const denied = moment.permissions.some(item => item.mode === 'DENY' && (item.userId === viewerId || (item.groupId && groupIds.has(item.groupId))));
+  if (denied) throw new Error('无权查看该动态');
+  if (moment.privacyType === 'PRIVATE') throw new Error('无权查看该动态');
+  if (moment.privacyType === 'VISIBLE_TO') {
+    const allowed = moment.permissions.some(item => item.mode === 'ALLOW' && (item.userId === viewerId || (item.groupId && groupIds.has(item.groupId))));
+    if (!allowed) throw new Error('无权查看该动态');
+  }
+  return moment;
+}
+
 export async function createMoment(
   userId: string,
   content: string,
@@ -75,10 +109,7 @@ export async function createMoment(
 }
 
 export async function getMoments(userId: string, page = 1, limit = 20, targetUserId?: string) {
-  const friendships = await prisma.friend.findMany({
-    where: { OR: [{ userId }, { friendId: userId }], status: 'accepted' },
-  });
-  const friendIds = friendships.map(f => f.userId === userId ? f.friendId : f.userId);
+  const friendIds = await acceptedFriendIds(userId);
   const visibleIds = [userId, ...friendIds];
 
   const myMemberships = await prisma.friendGroupMember.findMany({
@@ -134,10 +165,24 @@ export async function getMoments(userId: string, page = 1, limit = 20, targetUse
     prisma.moment.count({ where }),
   ]);
 
-  return { moments, total, hasMore: page * limit < total };
+  const visibleInteractorIds = [...new Set([userId, ...friendIds])];
+  const sanitizedMoments = await Promise.all(moments.map(async moment => {
+    const visibleLikes = moment.likes.filter(like => visibleInteractorIds.includes(like.userId));
+    const visibleComments = await prisma.momentComment.count({
+      where: { momentId: moment.id, userId: { in: visibleInteractorIds } },
+    });
+    return {
+      ...moment,
+      likes: visibleLikes,
+      _count: { likes: visibleLikes.length, comments: visibleComments },
+    };
+  }));
+
+  return { moments: sanitizedMoments, total, hasMore: page * limit < total };
 }
 
 export async function toggleLike(momentId: string, userId: string) {
+  await canViewMoment(momentId, userId);
   const existing = await prisma.momentLike.findUnique({
     where: { momentId_userId: { momentId, userId } },
   });
@@ -150,6 +195,7 @@ export async function toggleLike(momentId: string, userId: string) {
 }
 
 export async function addComment(momentId: string, userId: string, content: string) {
+  await canViewMoment(momentId, userId);
   return prisma.momentComment.create({
     data: { momentId, userId, content },
     include: { user: { select: { id: true, username: true, nickname: true, avatar: true } } },
@@ -157,23 +203,8 @@ export async function addComment(momentId: string, userId: string, content: stri
 }
 
 export async function getComments(momentId: string, viewerId: string) {
-  const moment = await prisma.moment.findUnique({
-    where: { id: momentId },
-    select: { userId: true },
-  });
-  if (!moment) throw new Error('动态不存在');
-
-  const friendships = await prisma.friend.findMany({
-    where: {
-      status: 'accepted',
-      OR: [
-        { userId: viewerId },
-        { friendId: viewerId },
-      ],
-    },
-    select: { userId: true, friendId: true },
-  });
-  const friendIds = new Set(friendships.map(f => f.userId === viewerId ? f.friendId : f.userId));
+  const moment = await canViewMoment(momentId, viewerId);
+  const friendIds = new Set(await acceptedFriendIds(viewerId));
 
   return prisma.momentComment.findMany({
     where: {

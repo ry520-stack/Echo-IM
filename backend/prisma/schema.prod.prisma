@@ -19,6 +19,7 @@ model User {
   avatar              String   @default("")
   nickname            String   @default("")
   status              String   @default("")
+  presence            String   @default("online")
   autoReply           String   @default("")
   allowStrangerMessage  Boolean  @default(true)
   readReceiptsEnabled   Boolean  @default(true)
@@ -190,6 +191,8 @@ model PetBond {
   intimacy      Int      @default(0)
   coins         Int      @default(20)
   biscuits      Int      @default(1)
+  toys          Int      @default(0)
+  medicines     Int      @default(0)
   activity      String   @default("idle")
   activityUntil DateTime?
   skin          String   @default("classic")
