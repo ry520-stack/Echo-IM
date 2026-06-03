@@ -13,7 +13,6 @@ import FriendsPage from './pages/FriendsPage';
 import GroupsPage from './pages/GroupsPage';
 import MomentsPage from './pages/MomentsPage';
 import SearchMessagesPage from './pages/SearchMessagesPage';
-import FavoritesPage from './pages/FavoritesPage';
 import TimeCapsulePage from './pages/TimeCapsulePage';
 import ChatSettingsPage from './pages/ChatSettingsPage';
 import StarZoneManagePage from './pages/StarZoneManagePage';
@@ -77,7 +76,6 @@ export default function App() {
                   <Route path="/groups" element={<GroupsPage />} />
                   <Route path="/moments" element={<MomentsPage />} />
                   <Route path="/search" element={<SearchMessagesPage />} />
-                  <Route path="/favorites" element={<FavoritesPage />} />
                   <Route path="/time-capsule" element={<TimeCapsulePage />} />
                   <Route path="/orbit/:userId" element={<MomentsPage />} />
                   <Route path="/chat/:userId/settings" element={<ChatSettingsPage />} />
