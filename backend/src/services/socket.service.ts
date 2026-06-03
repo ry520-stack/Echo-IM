@@ -20,6 +20,7 @@ export function isUserOnline(userId: string) {
 
 function previewMessage(type: string, content: string) {
   if (type === 'image') return '[\u56fe\u7247]';
+  if (type === 'emoji') return '[\u8868\u60c5\u5305]';
   if (type === 'voice') return '[\u8bed\u97f3]';
   if (type === 'video') return '[\u89c6\u9891]';
   if (type === 'call') return content || '[\u901a\u8bdd]';
@@ -42,7 +43,7 @@ function petMessageAction(content: string) {
 }
 
 async function growPetFromMessage(params: { senderId: string; receiverId?: string; messageType?: string }) {
-  if (!params.receiverId || ['call', 'pet', 'pet-adopt'].includes(params.messageType || '')) return;
+  if (!params.receiverId || ['call', 'pet', 'pet-adopt', 'emoji'].includes(params.messageType || '')) return;
   const [userAId, userBId] = params.senderId < params.receiverId
     ? [params.senderId, params.receiverId]
     : [params.receiverId, params.senderId];
@@ -54,7 +55,7 @@ async function growPetFromMessage(params: { senderId: string; receiverId?: strin
         { senderId: params.senderId, receiverId: params.receiverId },
         { senderId: params.receiverId, receiverId: params.senderId },
       ],
-      type: { notIn: ['pet', 'pet-adopt', 'call'] },
+      type: { notIn: ['pet', 'pet-adopt', 'call', 'emoji'] },
     },
   });
   const now = new Date();
@@ -67,7 +68,7 @@ async function growPetFromMessage(params: { senderId: string; receiverId?: strin
         { senderId: params.senderId, receiverId: params.receiverId },
         { senderId: params.receiverId, receiverId: params.senderId },
       ],
-      type: { notIn: ['pet', 'pet-adopt', 'call'] },
+      type: { notIn: ['pet', 'pet-adopt', 'call', 'emoji'] },
       createdAt: { gte: todayStart },
     },
   });
@@ -190,7 +191,7 @@ export function initSocket(httpServer: HttpServer) {
     }, ack?: (res: any) => void) => {
       try {
         // 基础校验
-        if (!data.content?.trim() && data.type !== 'image' && data.type !== 'voice' && data.type !== 'video') {
+        if (!data.content?.trim() && data.type !== 'image' && data.type !== 'emoji' && data.type !== 'voice' && data.type !== 'video') {
           return ack?.({ error: 'EMPTY_MESSAGE', message: '消息内容不能为空' });
         }
         if (data.content && data.content.length > 3000) {

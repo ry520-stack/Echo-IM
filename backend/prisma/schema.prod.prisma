@@ -18,6 +18,7 @@ model User {
   digitalId           Int      @unique
   avatar              String   @default("")
   nickname            String   @default("")
+  gender              String   @default("")
   status              String   @default("")
   presence            String   @default("online")
   autoReply           String   @default("")
@@ -222,6 +223,8 @@ model CoupleBond {
   userACityName String   @default("")
   userBCityCode String   @default("")
   userBCityName String   @default("")
+  userALabel    String   @default("")
+  userBLabel    String   @default("")
   userALat      Float?
   userALng      Float?
   userBLat      Float?

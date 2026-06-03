@@ -11,13 +11,16 @@ export async function getUser(userId: string) {
 
 export async function updateUser(
   userId: string,
-  data: { nickname?: string; avatar?: string; status?: string; presence?: string; allowStrangerMessage?: boolean; readReceiptsEnabled?: boolean; callRingtoneUrl?: string; callRingtoneMode?: string }
+  data: { nickname?: string; avatar?: string; gender?: string; status?: string; presence?: string; allowStrangerMessage?: boolean; readReceiptsEnabled?: boolean; callRingtoneUrl?: string; callRingtoneMode?: string }
 ) {
   if (data.callRingtoneMode && !['peer', 'mine'].includes(data.callRingtoneMode)) {
     throw new Error('Invalid ringtone mode');
   }
   if (data.presence && !['online', 'busy', 'away', 'dnd'].includes(data.presence)) {
     throw new Error('Invalid presence');
+  }
+  if (data.gender && !['male', 'female', 'other'].includes(data.gender)) {
+    throw new Error('Invalid gender');
   }
   const user = await prisma.user.update({
     where: { id: userId },

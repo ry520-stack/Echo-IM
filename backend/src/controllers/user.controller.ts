@@ -11,11 +11,12 @@ export async function getMe(req: Request, res: Response) {
 }
 
 export async function updateMe(req: Request, res: Response) {
-  const { nickname, avatar, status, presence, allowStrangerMessage, readReceiptsEnabled, callRingtoneUrl, callRingtoneMode } = req.body;
+  const { nickname, avatar, gender, status, presence, allowStrangerMessage, readReceiptsEnabled, callRingtoneUrl, callRingtoneMode } = req.body;
   try {
     const user = await userService.updateUser(req.userId, {
       nickname,
       avatar,
+      gender,
       status,
       presence,
       allowStrangerMessage,

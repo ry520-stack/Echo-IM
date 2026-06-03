@@ -34,6 +34,12 @@ function peerId(bond: any, userId: string) {
   return bond.userAId === userId ? bond.userBId : bond.userAId;
 }
 
+function defaultCoupleLabel(gender?: string) {
+  if (gender === 'male') return '\u8001\u516c';
+  if (gender === 'female') return '\u5ab3\u5987\u513f';
+  return '\u4eb2\u7231\u7684';
+}
+
 async function requireFriend(userId: string, otherId: string) {
   const friend = await prisma.friend.findFirst({
     where: { status: 'accepted', OR: [{ userId, friendId: otherId }, { userId: otherId, friendId: userId }] },
@@ -107,12 +113,17 @@ export async function getSummary(userId: string) {
   const bond = await findCurrent(userId);
   if (!bond) return { status: 'none' };
   const otherId = peerId(bond, userId);
-  const other = await prisma.user.findUnique({ where: { id: otherId }, select: { id: true, username: true, nickname: true, avatar: true, digitalId: true } });
+  const [other, me] = await Promise.all([
+    prisma.user.findUnique({ where: { id: otherId }, select: { id: true, username: true, nickname: true, avatar: true, digitalId: true, gender: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { gender: true } }),
+  ]);
   const mineIsA = bond.userAId === userId;
   const myCityCode = mineIsA ? bond.userACityCode : bond.userBCityCode;
   const myCityName = mineIsA ? bond.userACityName : bond.userBCityName;
   const peerCityCode = mineIsA ? bond.userBCityCode : bond.userACityCode;
   const peerCityName = mineIsA ? bond.userBCityName : bond.userACityName;
+  const myLabel = (mineIsA ? bond.userALabel : bond.userBLabel) || defaultCoupleLabel(me?.gender);
+  const peerLabel = (mineIsA ? bond.userBLabel : bond.userALabel) || defaultCoupleLabel(other?.gender);
   const [myWeather, peerWeather, pet] = await Promise.all([
     weather(myCityCode).catch(() => null),
     weather(peerCityCode).catch(() => null),
@@ -143,6 +154,10 @@ export async function getSummary(userId: string) {
     myCityName,
     peerCityCode,
     peerCityName,
+    myGender: me?.gender || '',
+    peerGender: other?.gender || '',
+    myLabel,
+    peerLabel,
     myWeather,
     peerWeather,
     weatherAlert: weatherAlert(peerWeather),
@@ -192,6 +207,11 @@ export async function updateSettings(userId: string, data: any) {
     if (key in data) update[key] = data[key] ? new Date(data[key]) : null;
   }
   if ('countdownTitle' in data) update.countdownTitle = String(data.countdownTitle || '').slice(0, 30);
+  if ('myLabel' in data) update[mineIsA ? 'userALabel' : 'userBLabel'] = String(data.myLabel || '').slice(0, 12);
+  if ('peerLabel' in data) update[mineIsA ? 'userBLabel' : 'userALabel'] = String(data.peerLabel || '').slice(0, 12);
+  if ('gender' in data && ['male', 'female', 'other', ''].includes(String(data.gender || ''))) {
+    await prisma.user.update({ where: { id: userId }, data: { gender: String(data.gender || '') } });
+  }
   if ('cityName' in data) {
     if (String(data.cityName || '').trim()) {
       const city = await geocode(String(data.cityName));
@@ -359,8 +379,8 @@ export async function getWeeklyReport(userId: string) {
   return {
     since,
     activeDays,
-    messageCount: messages.filter(message => !['call', 'pet', 'pet-adopt'].includes(message.type)).length,
-    photoCount: messages.filter(message => message.type === 'image').length,
+    messageCount: messages.filter(message => !['call', 'pet', 'pet-adopt', 'emoji'].includes(message.type)).length,
+    photoCount: messages.filter(message => message.type === 'image' && !/\/emojis?\//i.test(message.content)).length,
     callMinutes: Math.floor(messages.filter(message => message.type === 'call').reduce((sum, message) => sum + parseCallSeconds(message.content), 0) / 60),
     pet: await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId: bond.userAId, userBId: bond.userBId } }, select: { name: true, level: true, experience: true, intimacy: true, coins: true, skin: true } }),
   };

@@ -8,6 +8,7 @@ interface User {
   digitalId: number;
   nickname: string;
   avatar: string;
+  gender?: 'male' | 'female' | 'other' | '';
   status: string;
   presence?: 'online' | 'busy' | 'away' | 'dnd';
   allowStrangerMessage: boolean;

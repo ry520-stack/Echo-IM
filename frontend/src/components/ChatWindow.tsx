@@ -115,7 +115,6 @@ const petSkinStyle = (skin?: string) => skin === 'starlight'
   : skin === 'summer'
     ? 'ring-4 ring-cyan-300/70 shadow-[0_0_28px_rgba(34,211,238,0.7)]'
     : '';
-const petSkinName = (skin?: string) => skin === 'starlight' ? '星光限定' : skin === 'summer' ? '夏日海盐' : '共同宠物';
 
 const ERROR_MAP: Record<string, string> = {
   blocked: '对方已将你拉黑，或你已拉黑对方',
@@ -248,7 +247,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     }
   };
 
-  const runPetAction = async (action: 'check-in' | 'buy-biscuit' | 'buy-toy' | 'buy-medicine' | 'buy-repair-card' | 'feed' | 'play' | 'heal' | 'study' | 'work' | 'sleep') => {
+  const runPetAction = async (action: 'check-in' | 'buy-biscuit' | 'buy-toy' | 'buy-medicine' | 'buy-repair-card' | 'buy-biscuit-pack' | 'buy-toy-pack' | 'buy-care-kit' | 'feed' | 'play' | 'heal' | 'study' | 'work' | 'sleep') => {
     setPetBusy(true);
     try {
       const next = await api<PetBond>('POST', `/api/pets/${realPeerId}/action`, { action });
@@ -1283,7 +1282,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     const atStart = emojiPage === 0 && dx > 0;
     const atEnd = emojiPage === emojiMaxPage && dx < 0;
     e.preventDefault();
-    setEmojiDragX((atStart || atEnd) ? dx * 0.18 : dx * 0.68);
+    setEmojiDragX((atStart || atEnd) ? dx * 0.1 : dx * 0.42);
   };
 
   const handleEmojiTouchEnd = (e: React.TouchEvent) => {
@@ -1294,7 +1293,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     emojiSwipeRef.current.active = false;
     setEmojiDragging(false);
     setEmojiDragX(0);
-    if (Math.abs(dx) < 68 || Math.abs(dx) < dy) return;
+    if (Math.abs(dx) < 82 || Math.abs(dx) < dy * 1.15) return;
     const direction = dx < 0 ? 1 : -1;
     setEmojiPageDirection(direction);
     setEmojiPage(page => Math.max(0, Math.min(emojiMaxPage, page + direction)));
@@ -1322,7 +1321,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       receiverId: isGroup ? null : peerId,
       groupId: isGroup ? peerId : null,
       content: emoji.imageUrl,
-      type: 'image',
+      type: 'emoji',
       isRecalled: false,
       replyToId: replyTo?.id || null,
       replyTo: replyTo ? { id: replyTo.id, content: replyTo.content, type: replyTo.type, sender: replyTo.sender } : null,
@@ -1333,7 +1332,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     socket.emit('message:send', {
       ...(isGroup ? { groupId: peerId } : { receiverId: peerId }),
-      content: emoji.imageUrl, type: 'image',
+      content: emoji.imageUrl, type: 'emoji',
       replyToId: replyTo?.id || undefined,
     }, (res: any) => {
       if (res?.error) {
@@ -1430,7 +1429,6 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
               {petAction === 'sleep' || pet.activity === 'sleep' ? '💤' : pet.activity === 'study' ? '🎒' : pet.activity === 'work' ? '💼' : petAction === 'feed' ? '😋' : petAction === 'laugh' ? '😄' : pet.mood === 'sick' ? '🤒' : pet.mood === 'sad' ? '🥺' : '✨'}
             </span>
           </button>
-          <span className="mt-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-medium text-amber-600 shadow-md dark:bg-gray-900/95 dark:text-amber-300">{petSkinName(pet.skin)}</span>
         </motion.div>
       )}
       {/* Chat background layer with GPU acceleration */}
@@ -1515,7 +1513,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <div className="px-3 py-3 space-y-2 relative z-[1] min-h-full">
             {messages.map((msg) => {
               const isMine = msg.senderId === user?.id;
-              const isMediaMessage = msg.type === 'image' || msg.type === 'video';
+              const isMediaMessage = msg.type === 'image' || msg.type === 'emoji' || msg.type === 'video';
 
               if (msg.type === 'pet') {
                 return (
@@ -1567,7 +1565,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   {msg.replyTo && !msg.isRecalled && (
                     <div className={`mb-1 max-w-[75%] rounded-lg bg-gray-200/60 px-3 py-1.5 text-xs text-gray-500 dark:bg-gray-800 ${isMine ? 'text-right' : ''}`}>
                       <span className="font-medium text-primary-500">{msg.replyTo.sender.nickname || msg.replyTo.sender.username}:</span>{' '}
-                      {msg.replyTo.type === 'image' ? '[图片]' : msg.replyTo.type === 'video' ? '[视频]' : msg.replyTo.type === 'voice' ? '[语音]' : msg.replyTo.type === 'call' ? (msg.replyTo.content || '[通话]') : msg.replyTo.content.slice(0, 30)}
+                      {msg.replyTo.type === 'image' ? '[图片]' : msg.replyTo.type === 'emoji' ? '[表情包]' : msg.replyTo.type === 'video' ? '[视频]' : msg.replyTo.type === 'voice' ? '[语音]' : msg.replyTo.type === 'call' ? (msg.replyTo.content || '[通话]') : msg.replyTo.content.slice(0, 30)}
                     </div>
                   )}
 
@@ -1643,16 +1641,16 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           </span>
                         ) : (
                           <>
-                            {msg.type === 'image' ? (
+                            {msg.type === 'image' || msg.type === 'emoji' ? (
                               <div className="relative">
-                                <img src={assetUrl(msg.content)} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()} onClick={() => setEmojiPreview(assetUrl(msg.content))} className="max-h-[170px] max-w-[170px] cursor-pointer rounded-2xl object-contain" loading="lazy" onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)} />
-                                <button
+                                <img src={assetUrl(msg.content)} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()} onClick={() => setEmojiPreview(assetUrl(msg.content))} className={`${msg.type === 'emoji' ? 'max-h-[120px] max-w-[120px] bg-transparent' : 'max-h-[170px] max-w-[170px]'} cursor-pointer rounded-2xl object-contain`} loading="lazy" onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)} />
+                                {msg.type === 'image' && <button
                                   onClick={() => collectAsEmoji(msg.content)}
                                   className="absolute -bottom-5 right-0 hidden rounded bg-gray-700 px-1.5 py-0.5 text-[10px] text-white group-hover:block hover:bg-gray-600"
                                   title="收藏为表情"
                                 >
-                                  ⭐收藏
-                                </button>
+                                  ★收藏
+                                </button>}
                               </div>
                             ) : msg.type === 'video' ? (
                               <video
@@ -2165,6 +2163,18 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                 <div className="flex items-center justify-between rounded-xl bg-sky-50 p-3 dark:bg-sky-950/20">
                   <div><p className="font-semibold text-sky-700 dark:text-sky-300">补签卡</p><p className="text-[11px] text-sky-500">仅修复最近一次中断中的一天</p></div>
                   <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-repair-card')} className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">25 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-orange-50 p-3 dark:bg-orange-950/20">
+                  <div><p className="font-semibold text-orange-700 dark:text-orange-300">饼干礼包</p><p className="text-[11px] text-orange-500">一次获得 5 个饼干</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-biscuit-pack')} className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">22 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-fuchsia-50 p-3 dark:bg-fuchsia-950/20">
+                  <div><p className="font-semibold text-fuchsia-700 dark:text-fuchsia-300">玩具套装</p><p className="text-[11px] text-fuchsia-500">一次获得 3 个玩具</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-toy-pack')} className="rounded-lg bg-fuchsia-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">30 金币购买</button>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-rose-50 p-3 dark:bg-rose-950/20">
+                  <div><p className="font-semibold text-rose-700 dark:text-rose-300">照顾套装</p><p className="text-[11px] text-rose-500">饼干、玩具、药品组合</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-care-kit')} className="rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">45 金币购买</button>
                 </div>
               </div>
             ) : petTab === 'bag' ? (

@@ -46,7 +46,11 @@ interface Summary {
   peerWeather?: Weather | null;
   weatherAlert?: string;
   distanceKm?: number | null;
-  peer?: { id: string; username: string; nickname: string; avatar: string; digitalId: number };
+  peer?: { id: string; username: string; nickname: string; avatar: string; digitalId: number; gender?: string };
+  myGender?: string;
+  peerGender?: string;
+  myLabel?: string;
+  peerLabel?: string;
   pet?: { name: string; level: number; coins: number; activity: string; skin?: string } | null;
   myCycle?: { periodStart?: string; cycleLength?: number; periodLength?: number; shareWithPartner?: boolean } | null;
   peerCycle?: { isPeriodActive?: boolean; nextPeriodAt?: string } | null;
@@ -156,6 +160,11 @@ function countdown(value?: string) {
   const hours = Math.ceil((new Date(value).getTime() - Date.now()) / 3_600_000);
   return hours >= 0 ? `${Math.floor(hours / 24)} \u5929 ${hours % 24} \u5c0f\u65f6` : S.arrived;
 }
+function defaultRole(gender?: string) {
+  if (gender === 'male') return S.husband;
+  if (gender === 'female') return S.wife;
+  return '\u4eb2\u7231\u7684';
+}
 function imagesOf(item: CoupleItem) {
   try { return JSON.parse(item.images || '[]') as string[]; } catch { return []; }
 }
@@ -198,8 +207,9 @@ export default function RelationshipSpaceContent() {
   const [decisionOptions, setDecisionOptions] = useState('\u706b\u9505\u3001\u7535\u5f71\u3001\u6563\u6b65\u3001\u5976\u8336');
   const [decisionResult, setDecisionResult] = useState('');
   const [albumOpen, setAlbumOpen] = useState(false);
-  const [selfRole, setSelfRole] = useState(() => localStorage.getItem('echo-couple-role-self') || S.husband);
-  const [peerRole, setPeerRole] = useState(() => localStorage.getItem('echo-couple-role-peer') || S.wife);
+  const [selfRole, setSelfRole] = useState(S.husband);
+  const [peerRole, setPeerRole] = useState(S.wife);
+  const [gender, setGender] = useState('');
 
   const load = useCallback(async () => setSummary(await api<Summary>('GET', '/api/couples')), []);
   const loadItems = useCallback(async () => setItems(await api<CoupleItem[]>('GET', '/api/couples/items')), []);
@@ -220,7 +230,10 @@ export default function RelationshipSpaceContent() {
       countdownTitle: summary.countdownTitle || '',
       cityName: summary.myCityName || '',
     });
-  }, [summary]);
+    setGender(summary.myGender || user?.gender || '');
+    setSelfRole(summary.myLabel || defaultRole(summary.myGender || user?.gender));
+    setPeerRole(summary.peerLabel || defaultRole(summary.peerGender || summary.peer?.gender));
+  }, [summary, user?.gender]);
 
   const act = async (request: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -400,15 +413,21 @@ export default function RelationshipSpaceContent() {
         {section === 'settings' && (
           <section className="space-y-3 rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
             <input value={form.cityName} onChange={e => setForm({ ...form, cityName: e.target.value })} placeholder={S.cityPlaceholder} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+            <select value={gender} onChange={e => setGender(e.target.value)} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200">
+              <option value="">性别未设置</option>
+              <option value="male">男</option>
+              <option value="female">女</option>
+              <option value="other">其他</option>
+            </select>
             <div className="grid grid-cols-2 gap-2">
-              <input value={selfRole} onChange={e => setSelfRole(e.target.value)} onBlur={() => localStorage.setItem('echo-couple-role-self', selfRole)} placeholder={S.roleSelf} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
-              <input value={peerRole} onChange={e => setPeerRole(e.target.value)} onBlur={() => localStorage.setItem('echo-couple-role-peer', peerRole)} placeholder={S.rolePeer} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <input value={selfRole} onChange={e => setSelfRole(e.target.value)} placeholder={S.roleSelf} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <input value={peerRole} onChange={e => setPeerRole(e.target.value)} placeholder={S.rolePeer} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             </div>
             <label className="block text-xs text-gray-400">{S.met}<input type="datetime-local" value={form.metAt} onChange={e => setForm({ ...form, metAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
             <label className="block text-xs text-gray-400">{S.dating}<input type="datetime-local" value={form.datingAt} onChange={e => setForm({ ...form, datingAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
             <input value={form.countdownTitle} onChange={e => setForm({ ...form, countdownTitle: e.target.value })} placeholder={S.nextDay} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             <input type="datetime-local" value={form.countdownAt} onChange={e => setForm({ ...form, countdownAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" />
-            <button disabled={busy} onClick={() => act(() => api('PATCH', '/api/couples', form), S.settingsSaved)} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white">{S.saveSettings}</button>
+            <button disabled={busy} onClick={() => act(() => api('PATCH', '/api/couples', { ...form, gender, myLabel: selfRole, peerLabel: peerRole }), S.settingsSaved)} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white">{S.saveSettings}</button>
             <button disabled={!summary.canUnbind || busy} onClick={() => { if (window.confirm('\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u540e\uff0c\u60c5\u4fa3\u7a7a\u95f4\u5c06\u5173\u95ed\u3002\u786e\u5b9a\u7ee7\u7eed\uff1f') && window.confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u771f\u7684\u8981\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u5417\uff1f')) act(() => api('POST', '/api/couples/unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u89e3\u9664'); }} className="w-full rounded-2xl py-2 text-xs text-red-500 disabled:text-gray-400">{summary.canUnbind ? S.unbind : `\u7ed1\u5b9a 90 \u5929\u5185\u4e0d\u53ef\u4e3b\u52a8\u89e3\u9664 · ${summary.unlockAt ? new Date(summary.unlockAt).toLocaleString() : ''}`}</button>
             <button disabled={busy} onClick={() => { if (window.confirm('\u4ec5\u5728\u62c9\u9ed1\u6216\u8d26\u53f7\u6ce8\u9500\u7b49\u7279\u6b8a\u60c5\u51b5\u4e0b\u4f7f\u7528\u3002\u786e\u5b9a\u7533\u8bf7\u5f3a\u5236\u89e3\u9664\uff1f')) act(() => api('POST', '/api/couples/force-unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u5f3a\u5236\u89e3\u9664'); }} className="w-full rounded-2xl py-1 text-xs text-gray-400">{S.forceUnbind}</button>
           </section>

@@ -263,6 +263,24 @@ export async function petAction(userId: string, peerId: string, action?: string)
     notifyPetUpdated(userId, peerId, 'bought-repair-card');
     return getPet(userId, peerId);
   }
+  if (action === 'buy-biscuit-pack') {
+    if (existing.coins < 22) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 22 }, biscuits: { increment: 5 } } });
+    notifyPetUpdated(userId, peerId, 'bought-biscuit-pack');
+    return getPet(userId, peerId);
+  }
+  if (action === 'buy-toy-pack') {
+    if (existing.coins < 30) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 30 }, toys: { increment: 3 } } });
+    notifyPetUpdated(userId, peerId, 'bought-toy-pack');
+    return getPet(userId, peerId);
+  }
+  if (action === 'buy-care-kit') {
+    if (existing.coins < 45) throw new Error('金币不足');
+    await prisma.petBond.update({ where: { id: existing.id }, data: { coins: { decrement: 45 }, biscuits: { increment: 2 }, toys: { increment: 1 }, medicines: { increment: 1 } } });
+    notifyPetUpdated(userId, peerId, 'bought-care-kit');
+    return getPet(userId, peerId);
+  }
   if (action === 'feed') {
     if (existing.biscuits < 1) throw new Error('背包里没有饼干');
     await prisma.petBond.update({ where: { id: existing.id }, data: { biscuits: { decrement: 1 }, intimacy: { increment: 1 } } });
@@ -283,10 +301,10 @@ export async function petAction(userId: string, peerId: string, action?: string)
   }
   if (existing.activityUntil && existing.activityUntil > now) throw new Error('宠物正在忙，稍后再试');
   if (action === 'study') {
-    const experience = existing.experience + 4;
+    const experience = existing.experience + 12;
     await prisma.petBond.update({
       where: { id: existing.id },
-      data: { activity: 'study', activityUntil: new Date(now.getTime() + 30 * 60 * 1000), experience, level: Math.max(existing.level, Math.floor(experience / 20) + 1) },
+      data: { activity: 'study', activityUntil: new Date(now.getTime() + 3 * 60 * 60 * 1000), experience, coins: { increment: 6 }, level: Math.max(existing.level, Math.floor(experience / 20) + 1) },
     });
     notifyPetUpdated(userId, peerId, 'studying');
     return getPet(userId, peerId);
@@ -295,7 +313,7 @@ export async function petAction(userId: string, peerId: string, action?: string)
     if (existing.level < 3) throw new Error('宠物达到 3 级后才能工作');
     await prisma.petBond.update({
       where: { id: existing.id },
-      data: { activity: 'work', activityUntil: new Date(now.getTime() + 60 * 60 * 1000), coins: { increment: 10 + existing.level } },
+      data: { activity: 'work', activityUntil: new Date(now.getTime() + 4 * 60 * 60 * 1000), coins: { increment: 18 + existing.level * 2 }, experience: { increment: 4 } },
     });
     notifyPetUpdated(userId, peerId, 'working');
     return getPet(userId, peerId);
