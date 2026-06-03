@@ -118,6 +118,13 @@ const S = {
   cityPlaceholder: '\u6211\u7684\u57ce\u5e02\u540d\u79f0\uff0c\u4f8b\u5982\uff1a\u676d\u5dde',
   saveSettings: '\u4fdd\u5b58\u8bbe\u7f6e',
   settingsSaved: '\u60c5\u4fa3\u7a7a\u95f4\u8bbe\u7f6e\u5df2\u4fdd\u5b58',
+  roleSelf: '\u6211\u7684\u79f0\u547c',
+  rolePeer: '\u5bf9\u65b9\u79f0\u547c',
+  albumPage: '\u60c5\u4fa3\u76f8\u518c',
+  openAlbum: '\u6253\u5f00\u60c5\u4fa3\u76f8\u518c',
+  originalUpload: '\u539f\u56fe\u4e0a\u4f20\uff0c\u4e0d\u538b\u7f29\u753b\u8d28',
+  noPhoto: '\u8fd8\u6ca1\u6709\u7167\u7247',
+  close: '\u5173\u95ed',
   unbind: '\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb',
   forceUnbind: '\u7279\u6b8a\u60c5\u51b5\u5f3a\u5236\u89e3\u9664',
   refresh: '\u5237\u65b0\u60c5\u4fa3\u7a7a\u95f4',
@@ -155,18 +162,25 @@ function imagesOf(item: CoupleItem) {
 function songUrl(item: CoupleItem) {
   return [item.content, item.title].find(value => /^https?:\/\//i.test((value || '').trim()))?.trim() || '';
 }
+function decodeMaybeEscaped(value?: string) {
+  const text = value || '';
+  if (!text.includes('\\u')) return text;
+  try { return JSON.parse(`"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`); } catch { return text; }
+}
 function WeatherCard({ label, city, weather }: { label: string; city?: string; weather?: Weather | null }) {
+  const wind = decodeMaybeEscaped(weather?.winddirection);
+  const windpower = decodeMaybeEscaped(weather?.windpower);
+  const weatherText = decodeMaybeEscaped(weather?.weather);
   return (
     <div className="rounded-[24px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
       <p className="text-xs text-gray-400">{label} · {city || S.noCity}</p>
       <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">
-        {weather ? `${weather.weather || '--'} ${weather.temperature || '--'}°C` : S.noWeather}
+        {weather ? `${weatherText || '--'} ${weather.temperature || '--'}°C` : S.noWeather}
       </p>
-      {weather?.winddirection && <p className="mt-1 text-xs text-gray-400">{weather.winddirection}\u98ce {weather.windpower || ''}\u7ea7</p>}
+      {wind && <p className="mt-1 text-xs text-gray-400">{wind}风 {windpower || ''}级</p>}
     </div>
   );
 }
-
 export default function RelationshipSpaceContent() {
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -183,6 +197,9 @@ export default function RelationshipSpaceContent() {
   const [itemForm, setItemForm] = useState({ title: '', content: '', cityName: '', happenedAt: '', images: [] as string[] });
   const [decisionOptions, setDecisionOptions] = useState('\u706b\u9505\u3001\u7535\u5f71\u3001\u6563\u6b65\u3001\u5976\u8336');
   const [decisionResult, setDecisionResult] = useState('');
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const [selfRole, setSelfRole] = useState(() => localStorage.getItem('echo-couple-role-self') || S.husband);
+  const [peerRole, setPeerRole] = useState(() => localStorage.getItem('echo-couple-role-peer') || S.wife);
 
   const load = useCallback(async () => setSummary(await api<Summary>('GET', '/api/couples')), []);
   const loadItems = useCallback(async () => setItems(await api<CoupleItem[]>('GET', '/api/couples/items')), []);
@@ -215,6 +232,7 @@ export default function RelationshipSpaceContent() {
   const peerName = useMemo(() => nameOf(summary.peer), [summary.peer]);
   const selectedFriend = friends.find(friend => friend.peer.id === selectedPeerId);
   const visibleItems = items.filter(item => item.type === memoryTab);
+  const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map(url => ({ url, item })));
 
   const uploadPhoto = async (file: File) => {
     setBusy(true);
@@ -321,13 +339,13 @@ export default function RelationshipSpaceContent() {
               <div className="flex min-w-0 flex-1 flex-col items-center">
                 <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{user?.avatar ? <img src={assetUrl(user.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{(user?.nickname || user?.username || '\u6211')[0]}</div>}</div>
                 <p className="mt-2 max-w-full truncate text-sm font-bold">{user?.nickname || user?.username || '\u6211'}</p>
-                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{S.husband}</span>
+                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{selfRole}</span>
               </div>
               <div className="flex shrink-0 flex-col items-center"><div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-3xl text-rose-500 shadow-xl shadow-rose-500/20">{H}</div><p className="mt-2 text-[11px] text-white/75">{S.sweet}</p></div>
               <div className="flex min-w-0 flex-1 flex-col items-center">
                 <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{summary.peer?.avatar ? <img src={assetUrl(summary.peer.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{peerName[0]}</div>}</div>
                 <p className="mt-2 max-w-full truncate text-sm font-bold">{peerName}</p>
-                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{S.wife}</span>
+                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{peerRole}</span>
               </div>
             </div>
             <div className="relative mt-5 grid grid-cols-2 gap-3">
@@ -357,6 +375,8 @@ export default function RelationshipSpaceContent() {
         {section === 'memory' && (
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{MEMORY_TABS.map(({ key, label, Icon }) => <button key={key} onClick={() => setMemoryTab(key)} className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs ${memoryTab === key ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><Icon size={13} />{label}</button>)}</div>
+            {memoryTab === 'photo' && <button onClick={() => setAlbumOpen(true)} className="mb-3 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-4 py-3 text-left text-sm font-bold text-white shadow-lg shadow-rose-200/60"><span>{S.openAlbum}</span><span className="text-xs font-medium text-white/75">{albumPhotos.length} photos</span></button>}
+            {memoryTab === 'photo' && <p className="mb-2 text-xs text-gray-400">{S.originalUpload}</p>}
             {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{S.addPhoto}<input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} /></label>}
             {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
             <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{(memoryTab === 'photo' || memoryTab === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
@@ -367,13 +387,23 @@ export default function RelationshipSpaceContent() {
         {section === 'care' && (
           <>
             <RelationshipCarePanel myCycle={summary.myCycle} peerCycle={summary.peerCycle} currentSkin={summary.pet?.skin} onRefresh={() => load()} />
-            <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80"><p className="text-sm font-bold text-gray-900 dark:text-white">{S.decision}</p><p className="mt-1 text-xs text-gray-400">{S.decisionTip}</p><input value={decisionOptions} onChange={e => setDecisionOptions(e.target.value)} className="mt-3 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" /><button onClick={() => { const options = decisionOptions.split(/[,，、]/).map(value => value.trim()).filter(Boolean); setDecisionResult(options.length ? options[Math.floor(Math.random() * options.length)] : '\u8bf7\u5148\u586b\u5199\u5019\u9009\u9879'); }} className="mt-2 w-full rounded-2xl bg-violet-500 py-3 text-sm font-bold text-white">{S.decide}</button>{decisionResult && <p className="mt-3 rounded-2xl bg-violet-50 p-3 text-center text-sm font-bold text-violet-600 dark:bg-violet-950/30">{S.result}：{decisionResult}</p>}</section>
+            <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
+              <p className="text-sm font-bold text-gray-900 dark:text-white">{S.decision}</p>
+              <p className="mt-1 text-xs text-gray-400">{S.decisionTip}</p>
+              <input value={decisionOptions} onChange={e => setDecisionOptions(e.target.value)} className="mt-3 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <button onClick={() => { const options = decisionOptions.split(/[,，、]/).map(value => value.trim()).filter(Boolean); setDecisionResult(options.length ? options[Math.floor(Math.random() * options.length)] : '\u8bf7\u5148\u586b\u5199\u5019\u9009\u9879'); }} className="mt-2 w-full rounded-2xl bg-violet-500 py-3 text-sm font-bold text-white">{S.decide}</button>
+              {decisionResult && <p className="mt-3 rounded-2xl bg-violet-50 p-3 text-center text-sm font-bold text-violet-600 dark:bg-violet-950/30">{S.result}: {decisionResult}</p>}
+            </section>
           </>
         )}
 
         {section === 'settings' && (
           <section className="space-y-3 rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
             <input value={form.cityName} onChange={e => setForm({ ...form, cityName: e.target.value })} placeholder={S.cityPlaceholder} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+            <div className="grid grid-cols-2 gap-2">
+              <input value={selfRole} onChange={e => setSelfRole(e.target.value)} onBlur={() => localStorage.setItem('echo-couple-role-self', selfRole)} placeholder={S.roleSelf} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <input value={peerRole} onChange={e => setPeerRole(e.target.value)} onBlur={() => localStorage.setItem('echo-couple-role-peer', peerRole)} placeholder={S.rolePeer} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+            </div>
             <label className="block text-xs text-gray-400">{S.met}<input type="datetime-local" value={form.metAt} onChange={e => setForm({ ...form, metAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
             <label className="block text-xs text-gray-400">{S.dating}<input type="datetime-local" value={form.datingAt} onChange={e => setForm({ ...form, datingAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
             <input value={form.countdownTitle} onChange={e => setForm({ ...form, countdownTitle: e.target.value })} placeholder={S.nextDay} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
@@ -383,8 +413,39 @@ export default function RelationshipSpaceContent() {
             <button disabled={busy} onClick={() => { if (window.confirm('\u4ec5\u5728\u62c9\u9ed1\u6216\u8d26\u53f7\u6ce8\u9500\u7b49\u7279\u6b8a\u60c5\u51b5\u4e0b\u4f7f\u7528\u3002\u786e\u5b9a\u7533\u8bf7\u5f3a\u5236\u89e3\u9664\uff1f')) act(() => api('POST', '/api/couples/force-unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u5f3a\u5236\u89e3\u9664'); }} className="w-full rounded-2xl py-1 text-xs text-gray-400">{S.forceUnbind}</button>
           </section>
         )}
+        {albumOpen && (
+          <div className="fixed inset-0 z-[90] overflow-y-auto bg-white dark:bg-gray-950">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
+              <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 text-sm font-semibold text-gray-500"><X size={18} />{S.close}</button>
+              <h2 className="text-lg font-black text-gray-900 dark:text-white">{S.albumPage}</h2>
+              <label className="flex cursor-pointer items-center gap-1 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white">
+                <ImagePlus size={14} />{S.addPhoto}
+                <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
+              </label>
+            </div>
+            <div className="mx-auto max-w-lg p-4">
+              <div className="mb-4 rounded-[28px] bg-gradient-to-r from-rose-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-rose-200/60">
+                <p className="text-xs text-white/75">{S.originalUpload}</p>
+                <p className="mt-1 text-2xl font-black">{albumPhotos.length} photos</p>
+              </div>
+              {albumPhotos.length === 0 ? (
+                <p className="py-20 text-center text-sm text-gray-400">{S.noPhoto}</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {albumPhotos.map(({ url, item }, index) => (
+                    <a key={`${item.id}-${url}-${index}`} href={assetUrl(url)} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-[24px] bg-gray-100 shadow-sm">
+                      <img src={assetUrl(url)} alt={item.title || S.albumPage} className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-active:scale-95" />
+                      {(item.title || item.happenedAt) && <div className="p-2 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <button onClick={() => load()} className="mx-auto flex items-center gap-1 py-2 text-xs text-gray-400"><RefreshCw size={13} />{S.refresh}</button>
       </div>
     </div>
   );
 }
+

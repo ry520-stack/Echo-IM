@@ -426,7 +426,7 @@ export async function searchMessages(
     },
   });
 
-  const privatePeerIds = [...new Set(messages.flatMap(message => {
+  const privatePeerIds: string[] = [...new Set<string>(messages.flatMap(message => {
     if (message.groupId) return [];
     return [message.senderId === userId ? message.receiverId : message.senderId].filter((id): id is string => !!id);
   }))];
