@@ -111,7 +111,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
 
   const handleTouchStart = (e: React.TouchEvent, peerId: string) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
-    // 鍚屾浣滅敤鍩熷唴鎻愬墠鑾峰彇鍗＄墖 DOM锛圧eact 鍚堟垚浜嬩欢鍦?setTimeout 涓凡澶辨晥锛?
+    // React 合成事件在 setTimeout 中会失效，提前同步获取卡片 DOM。
     const cardNode = (e.currentTarget as HTMLElement).closest('[data-conv-card]') as HTMLElement;
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = setTimeout(() => {
@@ -297,13 +297,13 @@ export default function ConversationList({ searchText, searchTab }: { searchText
             <p className="text-xs text-gray-400 text-center py-4">未找到相关消息</p>
           ) : msgResults.map((msg: any) => (
             <div key={msg.id} onClick={() => nav(`/chat/${msg.groupId || (msg.senderId === user?.id ? msg.receiverId : msg.senderId)}?focus=${msg.id}`)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer mb-1">
-              <p className="text-xs text-gray-500 truncate">{msg.group?.name ? `${msg.group.name} 路 ` : ''}{msg.sender?.nickname || msg.sender?.username}</p>
+              <p className="text-xs text-gray-500 truncate">{msg.group?.name ? `${msg.group.name} · ` : ''}{msg.sender?.nickname || msg.sender?.username}</p>
               <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{formatSearchMsg(msg)}</p>
             </div>
           ))}
         </div>
       ) : (
-        /* 浼氳瘽鍒楄〃 */
+        /* 会话列表 */
         <div className="relative z-10 flex-1 overflow-y-auto flex flex-col">
           {loading ? (
             <div className="flex-1 flex items-center justify-center"><p className="text-sm tracking-wide text-slate-400">加载中...</p></div>
@@ -374,7 +374,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                           <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{formatLastMsg(conv.lastMessage)}</span>
                           {conv.unreadCount > 0 && <span className="ml-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-500 px-1.5 text-[10px] font-bold text-white">{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>}
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{getLastSeenText(conv.peer)}{conv.peer.status && isOnline && ` 路 ${conv.peer.status}`}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{getLastSeenText(conv.peer)}{conv.peer.status && isOnline && ` · ${conv.peer.status}`}</p>
                       </div>
                     </div>
                   </div>
@@ -384,17 +384,17 @@ export default function ConversationList({ searchText, searchTab }: { searchText
         </div>
       )}
 
-      {/* 鈺愨晲鈺?涓婁笅鏂囪彍鍗曪紙閿氬畾鍗＄墖 + 杈圭晫妫€娴?+ 姣涚幓鐠冿級鈺愨晲鈺?*/}
+      {/* 会话上下文菜单 */}
       {contextMenu && (() => {
         const { cardRect } = contextMenu;
         const menuH = 108;
         const menuW = 160;
-        // 浼樺厛鍦ㄥ崱鐗囦笅鏂瑰脊鍑猴紝绌洪棿涓嶈冻鍒欏脊鍒颁笂鏂?
+        // 优先在卡片下方弹出，空间不足则弹到上方。
         const spaceBelow = window.innerHeight - cardRect.bottom;
         const top = spaceBelow > menuH + 8
           ? cardRect.bottom + 4
           : cardRect.top - menuH - 4;
-        // X 灞呬腑浜庡崱鐗囷紝涓嶈秴鍑哄睆骞?
+        // X 居中于卡片，不超出屏幕。
         const left = Math.min(Math.max(cardRect.left + cardRect.width / 2 - menuW / 2, 8), window.innerWidth - menuW - 8);
 
         return (
@@ -405,11 +405,11 @@ export default function ConversationList({ searchText, searchTab }: { searchText
             >
               <button onClick={(e) => { e.stopPropagation(); togglePin(contextMenu.id); setContextMenu(null); }}
                 className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-white/50 dark:text-gray-300 dark:hover:bg-white/10 transition-colors">
-                {pinned.has(contextMenu.id) ? '鍙栨秷缃《' : '缃《'}
+                {pinned.has(contextMenu.id) ? '取消置顶' : '置顶'}
               </button>
               <button onClick={(e) => { e.stopPropagation(); toggleArchive(contextMenu.id); setContextMenu(null); }}
                 className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-white/50 dark:text-gray-300 dark:hover:bg-white/10 transition-colors">
-                {archived.has(contextMenu.id) ? '鍙栨秷闅愯棌' : '闅愯棌'}
+                {archived.has(contextMenu.id) ? '取消隐藏' : '隐藏'}
               </button>
               <button onClick={async (e) => {
                 e.stopPropagation();
@@ -421,7 +421,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                 setContextMenu(null);
               }}
                 className="flex w-full items-center px-4 py-2.5 text-sm text-red-500 hover:bg-red-50/50 dark:hover:bg-red-900/20 transition-colors">
-                鍒犻櫎浼氳瘽
+                删除会话
               </button>
             </div>
           </div>
