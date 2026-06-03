@@ -102,7 +102,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 - [云端架构实践](docs/juejin-01-echo-cloud-architecture.md)
 - [实时通信与 WebRTC](docs/juejin-02-echo-realtime-and-webrtc.md)
 - [云端产品化与存储演进](docs/juejin-03-echo-cloud-storage-and-product.md)
-- [抖音项目介绍文案](docs/douyin-echo-project-script.md)
 
 ## GitHub
 
