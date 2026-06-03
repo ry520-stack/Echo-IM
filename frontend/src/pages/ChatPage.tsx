@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,7 +20,7 @@ interface GroupInfo {
 }
 type ChatTarget = { type: 'user'; peer: Peer } | { type: 'group'; group: GroupInfo } | null;
 
-/** 线性插值 */
+/** 绾挎€ф彃鍊?*/
 function lerp(a: number, b: number, t: number) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
 
 export default function ChatPage() {
@@ -37,11 +37,11 @@ export default function ChatPage() {
   const [searchText, setSearchText] = useState('');
   const [searchTab, setSearchTab] = useState<'contacts' | 'messages'>('contacts');
 
-  // ─── Refs ───
+  // 鈹€鈹€鈹€ Refs 鈹€鈹€鈹€
   const pagerRef = useRef<HTMLDivElement>(null);
   const edgeSwipeRef = useRef({ x: 0, tracking: false });
 
-  // 动画元素 refs（直接 DOM 操作，零 setState）
+  // 鍔ㄧ敾鍏冪礌 refs锛堢洿鎺?DOM 鎿嶄綔锛岄浂 setState锛?
   const echoTitleRef = useRef<HTMLSpanElement>(null);
   const gravTitleRef = useRef<HTMLSpanElement>(null);
   const echoBtnRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +50,7 @@ export default function ChatPage() {
   const gravSearchRef = useRef<HTMLDivElement>(null);
   const echoTabsRef = useRef<HTMLDivElement>(null);
 
-  // ─── 滚动驱动动画（纯 DOM，不触发 React 渲染）───
+  // 鈹€鈹€鈹€ 婊氬姩椹卞姩鍔ㄧ敾锛堢函 DOM锛屼笉瑙﹀彂 React 娓叉煋锛夆攢鈹€鈹€
   const animFrameRef = useRef(0);
   useEffect(() => { return () => { cancelAnimationFrame(animFrameRef.current); }; }, []);
   const handleScroll = useCallback(() => {
@@ -58,9 +58,9 @@ export default function ChatPage() {
     animFrameRef.current = requestAnimationFrame(() => {
       const el = pagerRef.current;
       if (!el) return;
-      const p = el.scrollLeft / el.clientWidth; // 0 → 1
+      const p = el.scrollLeft / el.clientWidth; // 0 鈫?1
 
-      // 标题交叉淡入淡出 + 位移
+      // 鏍囬浜ゅ弶娣″叆娣″嚭 + 浣嶇Щ
       if (echoTitleRef.current) {
         echoTitleRef.current.style.opacity = String(lerp(1, 0, p * 2));
         echoTitleRef.current.style.transform = `translateX(${lerp(0, -16, p * 2)}px)`;
@@ -70,7 +70,7 @@ export default function ChatPage() {
         gravTitleRef.current.style.transform = `translateX(${lerp(16, 0, (p - 0.3) * 2)}px)`;
       }
 
-      // 按钮交叉
+      // 鎸夐挳浜ゅ弶
       if (echoBtnRef.current) {
         echoBtnRef.current.style.opacity = String(lerp(1, 0, p * 2));
         echoBtnRef.current.style.pointerEvents = p < 0.5 ? 'auto' : 'none';
@@ -80,7 +80,7 @@ export default function ChatPage() {
         gravBtnRef.current.style.pointerEvents = p > 0.5 ? 'auto' : 'none';
       }
 
-      // 搜索框交叉
+      // 鎼滅储妗嗕氦鍙?
       if (echoSearchRef.current) {
         echoSearchRef.current.style.opacity = String(lerp(1, 0, p * 2));
         echoSearchRef.current.style.transform = `translateX(${lerp(0, -20, p * 2)}px)`;
@@ -92,18 +92,18 @@ export default function ChatPage() {
         gravSearchRef.current.style.pointerEvents = p > 0.5 ? 'auto' : 'none';
       }
 
-      // 搜索 tabs（仅首页）
+      // 鎼滅储 tabs锛堜粎棣栭〉锛?
       if (echoTabsRef.current) {
         echoTabsRef.current.style.opacity = String(lerp(1, 0, p * 2));
       }
 
-      // 同步页码 state（仅在边界切换，用于条件渲染按钮/tabs）
+      // 鍚屾椤电爜 state锛堜粎鍦ㄨ竟鐣屽垏鎹紝鐢ㄤ簬鏉′欢娓叉煋鎸夐挳/tabs锛?
       const newPage = p < 0.5 ? 0 : 1;
       setPage(prev => prev !== newPage ? newPage : prev);
     });
   }, []);
 
-  // ─── 程序化切页 ───
+  // 鈹€鈹€鈹€ 绋嬪簭鍖栧垏椤?鈹€鈹€鈹€
   const switchPage = useCallback((idx: number) => {
     setPage(idx);
     setSearchText('');
@@ -116,7 +116,7 @@ export default function ChatPage() {
     return () => window.clearTimeout(timer);
   }, [searchParams, switchPage]);
 
-  // ─── 路由参数处理 ───
+  // 鈹€鈹€鈹€ 璺敱鍙傛暟澶勭悊 鈹€鈹€鈹€
   useEffect(() => {
     if (!paramId) { setTarget(null); setSearchError(''); setShowChatMobile(false); return; }
     let cancelled = false;
@@ -133,7 +133,7 @@ export default function ChatPage() {
         const g = gs.find(x => x.id === paramId);
         if (g) { setTarget({ type: 'group', group: g }); setSearchError(''); setShowChatMobile(true); return; }
       } catch {}
-      if (!cancelled) setSearchError(`未找到: ${paramId}`);
+      if (!cancelled) setSearchError(`鏈壘鍒? ${paramId}`);
     })();
     return () => { cancelled = true; };
   }, [paramId]);
@@ -166,13 +166,13 @@ export default function ChatPage() {
 
       <SidebarDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
-      {/* ═══ 固定顶部导航栏（动画驱动，零 setState）═══ */}
+      {/* 鈺愨晲鈺?鍥哄畾椤堕儴瀵艰埅鏍忥紙鍔ㄧ敾椹卞姩锛岄浂 setState锛夆晲鈺愨晲 */}
       {!isChatOpen && (
         <header className="shrink-0 border-b border-gray-100/60 bg-white/80 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/80">
           <div className="flex h-14 items-center gap-3 px-4">
             <button onClick={() => setDrawerOpen(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">☰</button>
 
-            {/* 标题：双层叠加交叉淡入 */}
+            {/* 鏍囬锛氬弻灞傚彔鍔犱氦鍙夋贰鍏?*/}
             <div className="flex flex-1 items-center gap-2 relative" style={{ minHeight: 28 }}>
               <span ref={echoTitleRef} className="absolute left-0 text-lg font-extrabold tracking-tight text-gray-900 dark:text-gray-100 select-none will-change-transform">
                 Echo
@@ -180,11 +180,11 @@ export default function ChatPage() {
               <span ref={gravTitleRef} className="absolute left-0 text-lg font-extrabold tracking-tight text-gray-900 dark:text-gray-100 select-none will-change-transform" style={{ opacity: 0 }}>
                 关系空间
               </span>
-              {/* 绿点固定在标题右侧 */}
-              <span className="ml-16 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: connected ? '#22c55e' : '#d1d5db' }} />
+              {/* 缁跨偣鍥哄畾鍦ㄦ爣棰樺彸渚?*/}
+              {page === 0 && <span className="ml-16 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: connected ? '#22c55e' : '#d1d5db' }} />}
             </div>
 
-            {/* 按钮交叉 */}
+            {/* 鎸夐挳浜ゅ弶 */}
             <div className="relative" style={{ minWidth: 72, minHeight: 30 }}>
               <button ref={echoBtnRef} onClick={() => nav('/friends')}
                 className="absolute right-0 top-0 rounded-xl bg-primary-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-primary-600 transition-colors">
@@ -194,16 +194,16 @@ export default function ChatPage() {
             </div>
           </div>
 
-          {/* 搜索框：双层叠加交叉淡入 */}
+          {/* 鎼滅储妗嗭細鍙屽眰鍙犲姞浜ゅ弶娣″叆 */}
           <div className="px-4 pb-2 relative" style={{ minHeight: 44 }}>
-            {/* Echo 搜索 */}
+            {/* Echo 鎼滅储 */}
             <div ref={echoSearchRef} className="absolute inset-x-4 top-0 will-change-transform">
               <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 dark:bg-zinc-900/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
                 <span className="text-slate-400 text-sm">🔍</span>
                 <input type="text" placeholder="搜索好友或聊天记录..."
                   className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-slate-400 dark:text-gray-300"
                   value={searchText} onChange={(e) => setSearchText(e.target.value)} />
-                {searchText && <button onClick={() => setSearchText('')} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>}
+                {searchText && <button onClick={() => setSearchText('')} className="text-slate-400 hover:text-slate-600 text-xs">×</button>}
               </div>
             </div>
             {/* Relationship space summary */}
@@ -223,7 +223,7 @@ export default function ChatPage() {
         </header>
       )}
 
-      {/* ═══ 横向分页容器（scroll-snap，原生手势）═══ */}
+      {/* 鈺愨晲鈺?妯悜鍒嗛〉瀹瑰櫒锛坰croll-snap锛屽師鐢熸墜鍔匡級鈺愨晲鈺?*/}
       <style>{`.pager-snap::-webkit-scrollbar { display: none; }`}</style>
       <div
         ref={pagerRef}
@@ -231,20 +231,20 @@ export default function ChatPage() {
         style={{ scrollBehavior: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onScroll={handleScroll}
       >
-        {/* 页面 0：会话列表 */}
+        {/* 椤甸潰 0锛氫細璇濆垪琛?*/}
         <div className="snap-start snap-always shrink-0 h-full overflow-hidden" style={{ width: '100%', minWidth: '100%' }}>
           <div className={`h-full flex-col overflow-hidden md:flex ${paramId ? 'md:w-80 md:border-r md:border-gray-200 md:dark:border-gray-700' : ''} ${isChatOpen ? 'hidden md:flex' : 'flex'}`}>
             <ConversationList searchText={searchText} searchTab={searchTab} />
           </div>
         </div>
 
-        {/* 页面 1：引力圈 */}
+        {/* 椤甸潰 1锛氬紩鍔涘湀 */}
         <div className="snap-start snap-always shrink-0 h-full overflow-hidden" style={{ width: '100%', minWidth: '100%' }}>
           <RelationshipSpaceContent />
         </div>
       </div>
 
-      {/* 桌面端聊天窗口 */}
+      {/* 妗岄潰绔亰澶╃獥鍙?*/}
       {paramId && (
         <div className="hidden md:flex flex-1 flex-col absolute inset-y-0 right-0 left-1/2">
           {searchError ? (
@@ -255,7 +255,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ═══ 页面指示器 ═══ */}
+      {/* 鈺愨晲鈺?椤甸潰鎸囩ず鍣?鈺愨晲鈺?*/}
       {!isChatOpen && (
         <div className="flex justify-center gap-2 py-2.5 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100/60 dark:border-gray-800/60 shrink-0">
           {[0, 1].map(i => (
@@ -265,7 +265,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ═══ 移动端聊天窗口 ═══ */}
+      {/* 鈺愨晲鈺?绉诲姩绔亰澶╃獥鍙?鈺愨晲鈺?*/}
       <AnimatePresence>
         {isChatOpen && (
           <motion.div className="fixed inset-0 z-50 bg-white dark:bg-gray-950 md:hidden" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', stiffness: 150, damping: 20, mass: 0.8 }}>

@@ -50,12 +50,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
   const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const ringTokenRef = useRef(0);
   const connectedAtRef = useRef<number | null>(null);
   const loggedCallRef = useRef(false);
 
   useEffect(() => { callStatusRef.current = callStatus; }, [callStatus]);
 
   const stopRinging = useCallback(() => {
+    ringTokenRef.current += 1;
     if (ringTimerRef.current) {
       clearInterval(ringTimerRef.current);
       ringTimerRef.current = null;
@@ -63,18 +65,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
+      ringtoneRef.current.removeAttribute('src');
+      ringtoneRef.current.load();
       ringtoneRef.current = null;
     }
   }, []);
 
-  const playDefaultRing = useCallback(() => {
+  const playDefaultRing = useCallback((token = ringTokenRef.current) => {
     try {
+      if (token !== ringTokenRef.current) return;
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContextClass();
       if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
       const ctx = audioCtxRef.current;
       const playTone = () => {
+        if (token !== ringTokenRef.current) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -93,10 +99,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     } catch { /* autoplay may be blocked */ }
   }, []);
 
-  const startRinging = useCallback((name: string, targetId: string, ringtoneUrl?: string) => {
+  const startRinging = useCallback((name: string, targetId: string, ringtoneUrl?: string, notify = true) => {
     stopRinging();
-    createNativeMessage(name || '\u6765\u7535', '\u9080\u8bf7\u4f60\u8bed\u97f3\u901a\u8bdd', { chatId: targetId });
-    if (document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
+    const token = ringTokenRef.current;
+    if (notify) createNativeMessage(name || '\u6765\u7535', '\u9080\u8bf7\u4f60\u8bed\u97f3\u901a\u8bdd', { chatId: targetId });
+    if (notify && document.visibilityState === 'hidden' && 'Notification' in window && Notification.permission === 'granted') {
       try {
         const notification = new Notification(name || '\u6765\u7535', {
           body: '\u9080\u8bf7\u4f60\u8bed\u97f3\u901a\u8bdd',
@@ -119,11 +126,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
         audio.loop = true;
         audio.volume = 0.9;
         ringtoneRef.current = audio;
-        audio.play().catch(() => playDefaultRing());
+        audio.play().catch(() => {
+          if (token === ringTokenRef.current) playDefaultRing(token);
+        });
         return;
       } catch { /* fallback */ }
     }
-    playDefaultRing();
+    playDefaultRing(token);
   }, [playDefaultRing, stopRinging, user?.callRingtoneUrl]);
 
   const cleanup = useCallback(() => {
@@ -238,10 +247,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           cleanup();
           return;
         }
-        const waitingUrl = user?.callRingtoneMode === 'mine'
-          ? user?.callRingtoneUrl
-          : (res?.receiverRingtoneUrl || user?.callRingtoneUrl);
-        startRinging('\u7b49\u5f85\u63a5\u542c', targetId, waitingUrl);
+        startRinging('\u7b49\u5f85\u63a5\u542c', targetId, res?.receiverRingtoneUrl || '', false);
       });
 
       callTimeoutRef.current = setTimeout(() => {
@@ -314,7 +320,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setCallerAvatar(data.callerAvatar || '');
       setIsCallMinimized(false);
       setCallStatus('receiving');
-      startRinging(data.callerName || '\u6765\u7535', data.senderId, data.receiverRingtoneUrl || user?.callRingtoneUrl);
+      startRinging(data.callerName || '\u6765\u7535', data.senderId, data.receiverRingtoneUrl || user?.callRingtoneUrl, true);
     };
 
     const onAccepted = async () => {
