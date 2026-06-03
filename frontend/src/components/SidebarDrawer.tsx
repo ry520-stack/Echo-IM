@@ -256,8 +256,8 @@ export default function SidebarDrawer({ open, onClose }: Props) {
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white shadow-md shadow-rose-500/20"><Heart size={19} /></span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-200">关系空间{unreadCouple && <span className="h-2 w-2 rounded-full bg-red-500" />}</span>
-                    <span className="mt-0.5 block truncate text-xs text-rose-400">{coupleStatus === 'active' ? '纪念日、天气、宠物与双人回忆' : coupleStatus === 'pending' ? '有一条情侣绑定申请待处理' : '邀请情侣开启双人空间'}</span>
+                    <span className="flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-200">情侣空间{unreadCouple && <span className="h-2 w-2 rounded-full bg-red-500" />}</span>
+                    <span className="mt-0.5 block truncate text-xs text-rose-400">{coupleStatus === 'active' ? '纪念日、天气、宠物与甜蜜回忆' : coupleStatus === 'pending' ? '有一条情侣绑定申请待处理' : '邀请情侣开启情侣空间'}</span>
                   </span>
                   <ChevronRight size={16} className="text-rose-300" />
                 </button>

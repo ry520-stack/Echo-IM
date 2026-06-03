@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
@@ -178,7 +178,7 @@ export default function ChatPage() {
                 Echo
               </span>
               <span ref={gravTitleRef} className="absolute left-0 text-lg font-extrabold tracking-tight text-gray-900 dark:text-gray-100 select-none will-change-transform" style={{ opacity: 0 }}>
-                关系空间
+                情侣空间
               </span>
               {/* 缁跨偣鍥哄畾鍦ㄦ爣棰樺彸渚?*/}
               {page === 0 && <span className="ml-16 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: connected ? '#22c55e' : '#d1d5db' }} />}
@@ -190,7 +190,7 @@ export default function ChatPage() {
                 className="absolute right-0 top-0 rounded-xl bg-primary-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-primary-600 transition-colors">
                 + 好友
               </button>
-              <button ref={gravBtnRef} className="absolute right-0 top-0 px-1 py-1.5 text-xs text-rose-500" style={{ opacity: 0, pointerEvents: 'none' }}>♥ 双人空间</button>
+              <button ref={gravBtnRef} className="absolute right-0 top-0 px-1 py-1.5 text-xs text-rose-500" style={{ opacity: 0, pointerEvents: 'none' }}>♥ 情侣空间</button>
             </div>
           </div>
 
@@ -210,7 +210,7 @@ export default function ChatPage() {
             <div ref={gravSearchRef} className="absolute inset-x-4 top-0 will-change-transform" style={{ opacity: 0, pointerEvents: 'none' }}>
               <div className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-500 dark:bg-rose-950/25 dark:text-rose-300">
                 <span>♥</span>
-                <span>共享纪念日、天气、宠物和双人回忆</span>
+                <span>共享纪念日、天气、宠物和甜蜜回忆</span>
               </div>
             </div>
           </div>
