@@ -527,20 +527,13 @@ export default function RelationshipSpaceContent() {
                 </label>
               </div>
             </div>
-            <div className="mx-auto max-w-lg p-4">
-              <div className="relative mb-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-rose-200/60">
-                <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/25 blur-2xl" />
-                <div className="absolute -bottom-10 left-4 h-28 w-28 rounded-full bg-fuchsia-200/30 blur-2xl" />
-                <p className="relative text-xs text-white/75">{S.originalUpload}</p>
-                <p className="relative mt-1 text-3xl font-black">{albumPhotos.length} photos</p>
-                <p className="relative mt-2 text-xs text-white/75">{S.tapPreview}</p>
-                {albumUploading && (
-                  <div className="relative mt-4 rounded-2xl bg-white/20 p-3 text-xs font-semibold">
-                    <div className="mb-2 flex items-center justify-between"><span>{S.uploading}</span><span>{albumProgress.done}/{albumProgress.total}</span></div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/25"><div className="h-full rounded-full bg-white transition-all" style={{ width: `${albumProgress.total ? Math.round(albumProgress.done / albumProgress.total * 100) : 0}%` }} /></div>
-                  </div>
-                )}
-              </div>
+            <div className="mx-auto max-w-lg p-3">
+              {albumUploading && (
+                <div className="mb-3 rounded-2xl bg-rose-500/90 p-3 text-xs font-semibold text-white shadow-lg shadow-rose-200/60">
+                  <div className="mb-2 flex items-center justify-between"><span>{S.uploading}</span><span>{albumProgress.done}/{albumProgress.total}</span></div>
+                  <div className="h-2 overflow-hidden rounded-full bg-white/25"><div className="h-full rounded-full bg-white transition-all" style={{ width: `${albumProgress.total ? Math.round(albumProgress.done / albumProgress.total * 100) : 0}%` }} /></div>
+                </div>
+              )}
               {albumPhotos.length === 0 ? (
                 <label className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-[32px] border border-dashed border-rose-200 bg-white/70 p-8 text-center shadow-sm">
                   <ImagePlus className="text-rose-400" size={34} />
@@ -552,8 +545,7 @@ export default function RelationshipSpaceContent() {
                 <div className="columns-2 gap-3 [column-fill:_balance]">
                   {albumPhotos.map(({ url, item, imageIndex }, index) => (
                     <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
-                      <CachedImage src={assetUrl(url)} alt={item.title || S.albumPage} className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
-                      {(item.title || item.happenedAt) && <div className="p-2.5 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700 dark:text-gray-200">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
+                      <CachedImage src={assetUrl(url)} alt="" className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
                     </button>
                   ))}
                 </div>
@@ -562,10 +554,9 @@ export default function RelationshipSpaceContent() {
             {previewPhoto && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewPhoto(null)}>
                 <button className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"><X size={22} /></button>
-                <CachedImage src={assetUrl(previewPhoto.url)} alt={previewPhoto.item.title || S.albumPage} className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
+                <CachedImage src={assetUrl(previewPhoto.url)} alt="" className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
                 <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-3 text-center text-sm text-white backdrop-blur" onClick={event => event.stopPropagation()}>
-                  {(previewPhoto.item.title || previewPhoto.item.happenedAt) && <><p className="font-bold">{previewPhoto.item.title || S.albumPage}</p>{previewPhoto.item.happenedAt && <p className="mt-1 text-xs text-white/70">{new Date(previewPhoto.item.happenedAt).toLocaleDateString()}</p>}</>}
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button disabled={previewPhoto.imageIndex <= 0 || busy} onClick={() => movePhoto(previewPhoto.item, previewPhoto.imageIndex, -1)} className="rounded-2xl bg-white/15 py-2 text-xs font-bold text-white disabled:opacity-35">{S.movePrev}</button>
                     <button disabled={previewPhoto.imageIndex >= imagesOf(previewPhoto.item).length - 1 || busy} onClick={() => movePhoto(previewPhoto.item, previewPhoto.imageIndex, 1)} className="rounded-2xl bg-white/15 py-2 text-xs font-bold text-white disabled:opacity-35">{S.moveNext}</button>
                   </div>
