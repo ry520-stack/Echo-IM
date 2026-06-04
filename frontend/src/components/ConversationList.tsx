@@ -313,7 +313,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
               return (
                 <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
                   <div className="mb-6 flex h-24 w-24 items-center justify-center rounded-3xl bg-white/50 backdrop-blur-xl text-5xl dark:bg-white/10 shadow-sm">💬</div>
-                  <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">娆㈣繋, {user?.nickname || user?.username}</h2>
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">欢迎，{user?.nickname || user?.username}</h2>
                   <div className="mt-4 inline-flex items-center gap-3 rounded-2xl bg-gray-100/80 px-5 py-2.5 dark:bg-gray-800/80">
                     <span className="text-xs tracking-widest text-gray-400 font-medium uppercase">ECHO ID</span>
                     <span className="font-mono text-lg font-bold tracking-wider text-gray-800 dark:text-gray-100 select-all">{user?.digitalId}</span>
