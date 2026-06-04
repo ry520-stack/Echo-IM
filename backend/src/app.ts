@@ -71,8 +71,9 @@ const authLimiter = rateLimit({
 // 静态文件服务
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 app.use('/uploads', express.static(uploadsDir, {
-  maxAge: '7d',
-  setHeaders: (res) => { res.setHeader('Cache-Control', 'public, max-age=604800'); },
+  maxAge: '365d',
+  immutable: true,
+  setHeaders: (res) => { res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); },
 }));
 
 // Health check

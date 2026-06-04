@@ -23,6 +23,7 @@ import { assetUrl } from '../utils/assetUrl';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useToast } from '../contexts/ToastContext';
+import CachedImage from './CachedImage';
 import RelationshipCarePanel from './RelationshipCarePanel';
 
 interface Friend {
@@ -515,7 +516,7 @@ export default function RelationshipSpaceContent() {
                 <div className="columns-2 gap-3 [column-fill:_balance]">
                   {albumPhotos.map(({ url, item }, index) => (
                     <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
-                      <img src={assetUrl(url)} alt={item.title || S.albumPage} className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
+                      <CachedImage src={assetUrl(url)} alt={item.title || S.albumPage} className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
                       {(item.title || item.happenedAt) && <div className="p-2.5 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700 dark:text-gray-200">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
                     </button>
                   ))}
@@ -525,7 +526,7 @@ export default function RelationshipSpaceContent() {
             {previewPhoto && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewPhoto(null)}>
                 <button className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"><X size={22} /></button>
-                <img src={assetUrl(previewPhoto.url)} alt={previewPhoto.item.title || S.albumPage} className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
+                <CachedImage src={assetUrl(previewPhoto.url)} alt={previewPhoto.item.title || S.albumPage} className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
                 {(previewPhoto.item.title || previewPhoto.item.happenedAt) && <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-3 text-center text-sm text-white backdrop-blur"><p className="font-bold">{previewPhoto.item.title || S.albumPage}</p>{previewPhoto.item.happenedAt && <p className="mt-1 text-xs text-white/70">{new Date(previewPhoto.item.happenedAt).toLocaleDateString()}</p>}</div>}
               </div>
             )}
