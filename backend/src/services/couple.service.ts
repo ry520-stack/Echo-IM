@@ -295,7 +295,7 @@ export async function createItem(userId: string, data: any) {
       type,
       title: String(data.title || '').slice(0, 80),
       content: String(data.content || '').slice(0, 1000),
-      images: JSON.stringify(Array.isArray(data.images) ? data.images.slice(0, 9) : []),
+      images: JSON.stringify(Array.isArray(data.images) ? data.images.slice(0, 80) : []),
       cityName: String(data.cityName || '').slice(0, 40),
       happenedAt: data.happenedAt ? new Date(data.happenedAt) : null,
     },

@@ -9,6 +9,7 @@ import {
   MapPin,
   Music,
   PawPrint,
+  Plus,
   RefreshCw,
   Send,
   Settings,
@@ -127,6 +128,11 @@ const S = {
   albumPage: '\u60c5\u4fa3\u76f8\u518c',
   openAlbum: '\u6253\u5f00\u60c5\u4fa3\u76f8\u518c',
   originalUpload: '\u539f\u56fe\u4e0a\u4f20\uff0c\u4e0d\u538b\u7f29\u753b\u8d28',
+  batchAdd: '\u6279\u91cf\u6dfb\u52a0',
+  photoWall: '\u7167\u7247\u5899',
+  uploading: '\u6b63\u5728\u4e0a\u4f20',
+  uploaded: '\u7167\u7247\u5df2\u52a0\u5165\u60c5\u4fa3\u76f8\u518c',
+  tapPreview: '\u70b9\u51fb\u7167\u7247\u67e5\u770b\u539f\u56fe',
   noPhoto: '\u8fd8\u6ca1\u6709\u7167\u7247',
   close: '\u5173\u95ed',
   unbind: '\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb',
@@ -168,6 +174,9 @@ function defaultRole(gender?: string) {
 function imagesOf(item: CoupleItem) {
   try { return JSON.parse(item.images || '[]') as string[]; } catch { return []; }
 }
+function masonryTone(index: number) {
+  return index % 5 === 0 ? 'aspect-[4/5]' : index % 5 === 1 ? 'aspect-square' : index % 5 === 2 ? 'aspect-[3/4]' : index % 5 === 3 ? 'aspect-[5/6]' : 'aspect-[4/3]';
+}
 function songUrl(item: CoupleItem) {
   return [item.content, item.title].find(value => /^https?:\/\//i.test((value || '').trim()))?.trim() || '';
 }
@@ -207,6 +216,9 @@ export default function RelationshipSpaceContent() {
   const [decisionOptions, setDecisionOptions] = useState('\u706b\u9505\u3001\u7535\u5f71\u3001\u6563\u6b65\u3001\u5976\u8336');
   const [decisionResult, setDecisionResult] = useState('');
   const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumUploading, setAlbumUploading] = useState(false);
+  const [albumProgress, setAlbumProgress] = useState({ done: 0, total: 0 });
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; item: CoupleItem } | null>(null);
   const [selfRole, setSelfRole] = useState(S.husband);
   const [peerRole, setPeerRole] = useState(S.wife);
   const [gender, setGender] = useState('');
@@ -247,20 +259,51 @@ export default function RelationshipSpaceContent() {
   const visibleItems = items.filter(item => item.type === memoryTab);
   const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map(url => ({ url, item })));
 
+  const uploadOnePhoto = async (file: File) => {
+    const data = new FormData();
+    data.append('file', file);
+    const token = localStorage.getItem('echo-token');
+    const response = await fetch(`${getServerUrl()}/api/upload/chat-image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: data });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || '\u4e0a\u4f20\u5931\u8d25');
+    return String(result.url || '');
+  };
   const uploadPhoto = async (file: File) => {
     setBusy(true);
     try {
-      const data = new FormData();
-      data.append('file', file);
-      const token = localStorage.getItem('echo-token');
-      const response = await fetch(`${getServerUrl()}/api/upload/chat-image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: data });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '\u4e0a\u4f20\u5931\u8d25');
-      setItemForm(current => ({ ...current, images: [...current.images, result.url].slice(0, 9) }));
+      const url = await uploadOnePhoto(file);
+      setItemForm(current => ({ ...current, images: [...current.images, url].slice(0, 80) }));
+    } catch (error: any) { toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error'); }
+    finally { setBusy(false); }
+  };
+  const uploadAlbumFiles = async (filesLike: FileList | File[]) => {
+    const files = Array.from(filesLike).filter(file => file.type.startsWith('image/')).slice(0, 80);
+    if (!files.length) return;
+    setAlbumUploading(true);
+    setBusy(true);
+    setAlbumProgress({ done: 0, total: files.length });
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        urls.push(await uploadOnePhoto(file));
+        setAlbumProgress({ done: urls.length, total: files.length });
+      }
+      await api('POST', '/api/couples/items', {
+        type: 'photo',
+        title: files.length > 1 ? `\u5171\u540c\u56de\u5fc6 ${files.length} \u5f20` : (files[0]?.name || S.albumPage),
+        content: '',
+        cityName: '',
+        happenedAt: new Date().toISOString(),
+        images: urls,
+      });
+      await loadItems();
+      toast(`${files.length} \u5f20${S.uploaded}`, 'success');
     } catch (error: any) {
       toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error');
     } finally {
+      setAlbumUploading(false);
       setBusy(false);
+      setAlbumProgress({ done: 0, total: 0 });
     }
   };
   const createItem = () => act(async () => {
@@ -390,7 +433,7 @@ export default function RelationshipSpaceContent() {
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{MEMORY_TABS.map(({ key, label, Icon }) => <button key={key} onClick={() => setMemoryTab(key)} className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs ${memoryTab === key ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><Icon size={13} />{label}</button>)}</div>
             {memoryTab === 'photo' && <button onClick={() => setAlbumOpen(true)} className="mb-3 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-4 py-3 text-left text-sm font-bold text-white shadow-lg shadow-rose-200/60"><span>{S.openAlbum}</span><span className="text-xs font-medium text-white/75">{albumPhotos.length} photos</span></button>}
             {memoryTab === 'photo' && <p className="mb-2 text-xs text-gray-400">{S.originalUpload}</p>}
-            {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{S.addPhoto}<input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} /></label>}
+            {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{memoryTab === 'photo' ? S.batchAdd : S.addPhoto}<input type="file" accept="image/*" multiple={memoryTab === 'photo'} className="hidden" onChange={e => { if (!e.target.files) return; memoryTab === 'photo' ? uploadAlbumFiles(e.target.files) : e.target.files[0] && uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
             {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
             <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{(memoryTab === 'photo' || memoryTab === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
             <div className="mt-4 space-y-2">{visibleItems.map(item => <div key={item.id} className="rounded-2xl bg-gray-50 p-3 dark:bg-gray-800/70">{imagesOf(item).length > 0 && <div className="mb-2 flex gap-2 overflow-x-auto">{imagesOf(item).map(url => <img key={url} src={assetUrl(url)} alt="" className="h-20 w-20 rounded-xl object-cover" />)}</div>}<div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.title || item.cityName || '\u672a\u547d\u540d\u8bb0\u5f55'}</p><p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>{memoryTab === 'song' && songUrl(item) && <audio className="mt-2 h-9 w-full" controls preload="none" src={songUrl(item)} />}{item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}</div><button onClick={() => archiveItem(item.id)} className="shrink-0 text-gray-300 hover:text-red-400"><Trash2 size={15} /></button></div></div>)}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>
@@ -433,33 +476,59 @@ export default function RelationshipSpaceContent() {
           </section>
         )}
         {albumOpen && (
-          <div className="fixed inset-0 z-[90] overflow-y-auto bg-white dark:bg-gray-950">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white/90 px-4 py-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
-              <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 text-sm font-semibold text-gray-500"><X size={18} />{S.close}</button>
-              <h2 className="text-lg font-black text-gray-900 dark:text-white">{S.albumPage}</h2>
-              <label className="flex cursor-pointer items-center gap-1 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white">
-                <ImagePlus size={14} />{S.addPhoto}
-                <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(e.target.files[0])} />
-              </label>
+          <div className="fixed inset-0 z-[90] overflow-y-auto bg-[radial-gradient(circle_at_top,#ffe0ec_0,#fff8fb_42%,#ffffff_75%)] dark:bg-gray-950">
+            <div className="sticky top-0 z-10 border-b border-white/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
+              <div className="mx-auto flex max-w-lg items-center justify-between">
+                <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 rounded-full bg-white/70 px-3 py-2 text-sm font-semibold text-gray-500 shadow-sm"><X size={18} />{S.close}</button>
+                <div className="text-center">
+                  <h2 className="text-lg font-black text-gray-900 dark:text-white">{S.albumPage}</h2>
+                  <p className="text-[11px] text-gray-400">{S.photoWall}</p>
+                </div>
+                <label className="flex cursor-pointer items-center gap-1 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-rose-200">
+                  <Plus size={14} />{S.batchAdd}
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) uploadAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
+                </label>
+              </div>
             </div>
             <div className="mx-auto max-w-lg p-4">
-              <div className="mb-4 rounded-[28px] bg-gradient-to-r from-rose-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-rose-200/60">
-                <p className="text-xs text-white/75">{S.originalUpload}</p>
-                <p className="mt-1 text-2xl font-black">{albumPhotos.length} photos</p>
+              <div className="relative mb-4 overflow-hidden rounded-[32px] bg-gradient-to-br from-rose-500 via-pink-500 to-fuchsia-500 p-5 text-white shadow-xl shadow-rose-200/60">
+                <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/25 blur-2xl" />
+                <div className="absolute -bottom-10 left-4 h-28 w-28 rounded-full bg-fuchsia-200/30 blur-2xl" />
+                <p className="relative text-xs text-white/75">{S.originalUpload}</p>
+                <p className="relative mt-1 text-3xl font-black">{albumPhotos.length} photos</p>
+                <p className="relative mt-2 text-xs text-white/75">{S.tapPreview}</p>
+                {albumUploading && (
+                  <div className="relative mt-4 rounded-2xl bg-white/20 p-3 text-xs font-semibold">
+                    <div className="mb-2 flex items-center justify-between"><span>{S.uploading}</span><span>{albumProgress.done}/{albumProgress.total}</span></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/25"><div className="h-full rounded-full bg-white transition-all" style={{ width: `${albumProgress.total ? Math.round(albumProgress.done / albumProgress.total * 100) : 0}%` }} /></div>
+                  </div>
+                )}
               </div>
               {albumPhotos.length === 0 ? (
-                <p className="py-20 text-center text-sm text-gray-400">{S.noPhoto}</p>
+                <label className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-[32px] border border-dashed border-rose-200 bg-white/70 p-8 text-center shadow-sm">
+                  <ImagePlus className="text-rose-400" size={34} />
+                  <p className="mt-3 text-sm font-bold text-gray-700">{S.noPhoto}</p>
+                  <p className="mt-1 text-xs text-gray-400">{S.batchAdd}</p>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) uploadAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
+                </label>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="columns-2 gap-3 [column-fill:_balance]">
                   {albumPhotos.map(({ url, item }, index) => (
-                    <a key={`${item.id}-${url}-${index}`} href={assetUrl(url)} target="_blank" rel="noreferrer" className="group overflow-hidden rounded-[24px] bg-gray-100 shadow-sm">
-                      <img src={assetUrl(url)} alt={item.title || S.albumPage} className="aspect-[3/4] w-full object-cover transition-transform duration-300 group-active:scale-95" />
-                      {(item.title || item.happenedAt) && <div className="p-2 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
-                    </a>
+                    <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
+                      <img src={assetUrl(url)} alt={item.title || S.albumPage} className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
+                      {(item.title || item.happenedAt) && <div className="p-2.5 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700 dark:text-gray-200">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
+                    </button>
                   ))}
                 </div>
               )}
             </div>
+            {previewPhoto && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewPhoto(null)}>
+                <button className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"><X size={22} /></button>
+                <img src={assetUrl(previewPhoto.url)} alt={previewPhoto.item.title || S.albumPage} className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
+                {(previewPhoto.item.title || previewPhoto.item.happenedAt) && <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-3 text-center text-sm text-white backdrop-blur"><p className="font-bold">{previewPhoto.item.title || S.albumPage}</p>{previewPhoto.item.happenedAt && <p className="mt-1 text-xs text-white/70">{new Date(previewPhoto.item.happenedAt).toLocaleDateString()}</p>}</div>}
+              </div>
+            )}
           </div>
         )}
         <button onClick={() => load()} className="mx-auto flex items-center gap-1 py-2 text-xs text-gray-400"><RefreshCw size={13} />{S.refresh}</button>
