@@ -181,6 +181,16 @@ function imagesOf(item: CoupleItem) {
 function masonryTone(index: number) {
   return index % 5 === 0 ? 'aspect-[4/5]' : index % 5 === 1 ? 'aspect-square' : index % 5 === 2 ? 'aspect-[3/4]' : index % 5 === 3 ? 'aspect-[5/6]' : 'aspect-[4/3]';
 }
+function albumDateKey(value?: string) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return '未设置日期';
+  return date.toISOString().slice(0, 10);
+}
+function albumDateLabel(key: string) {
+  if (key === '未设置日期') return key;
+  const date = new Date(`${key}T00:00:00`);
+  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+}
 function songUrl(item: CoupleItem) {
   return [item.content, item.title].find(value => /^https?:\/\//i.test((value || '').trim()))?.trim() || '';
 }
@@ -275,6 +285,16 @@ export default function RelationshipSpaceContent() {
   const photoItems = items.filter(item => item.type === 'photo');
   const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
   const recentAlbumPhotos = albumPhotos.slice(0, 8);
+  const albumDateGroups = useMemo(() => {
+    const map = new Map<string, typeof albumPhotos>();
+    for (const photo of albumPhotos) {
+      const key = albumDateKey(photo.item.happenedAt);
+      map.set(key, [...(map.get(key) || []), photo]);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, photos]) => ({ key, label: albumDateLabel(key), photos }));
+  }, [albumPhotos]);
 
   const uploadOnePhoto = async (file: File) => {
     const data = new FormData();
@@ -628,11 +648,22 @@ export default function RelationshipSpaceContent() {
                   })}
                 </div>
               ) : (
-                <div className="columns-2 gap-3 [column-fill:_balance]">
-                  {albumPhotos.map(({ url, item, imageIndex }, index) => (
-                    <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
-                      <CachedImage src={assetUrl(url)} alt="" className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
-                    </button>
+                <div className="space-y-5">
+                  {albumDateGroups.map(group => (
+                    <section key={group.key}>
+                      <div className="sticky top-[68px] z-[1] mb-3 flex items-center gap-3 rounded-full bg-white/80 px-3 py-2 text-xs font-bold text-gray-500 shadow-sm backdrop-blur">
+                        <span className="h-2 w-2 rounded-full bg-rose-400" />
+                        <span>{group.label}</span>
+                        <span className="ml-auto text-gray-300">{group.photos.length} 张</span>
+                      </div>
+                      <div className="columns-2 gap-3 [column-fill:_balance]">
+                        {group.photos.map(({ url, item, imageIndex }, index) => (
+                          <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
+                            <CachedImage src={assetUrl(url)} alt="" className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
               )}

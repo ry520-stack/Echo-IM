@@ -2,6 +2,25 @@ import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
 import { canAccessConversation } from './messagePermission.service';
 
+function previewConversationMessage(type: string, content: string) {
+  if (type === 'image') return '[图片]';
+  if (type === 'emoji') return '[表情包]';
+  if (type === 'voice') return '[语音]';
+  if (type === 'video') return '[视频]';
+  if (type === 'call') return content || '[通话]';
+  if (type === 'pet-adopt') {
+    try {
+      const event = JSON.parse(content)?.event;
+      if (event === 'requested') return '[共同宠物] 共同领养邀请';
+      if (event === 'accepted' || event === 'adopted') return '[共同宠物] 已同意共同领养';
+      if (event === 'rejected') return '[共同宠物] 已拒绝共同领养';
+    } catch { /* fall through */ }
+    return '[共同宠物]';
+  }
+  if (/^\/uploads\//.test(content)) return /\/emojis?\//i.test(content) ? '[表情包]' : '[图片]';
+  return content.length > 60 ? content.slice(0, 60) + '...' : content;
+}
+
 export async function getMessages(
   userId: string,
   peerId: string,
@@ -241,7 +260,7 @@ export async function getConversations(userId: string) {
       return {
         type: 'user',
         peer: { ...peer, alias: aliasMap.get(peer.id) || '', isGroup: false },
-        lastMessage: lastMsg,
+        lastMessage: { ...lastMsg, content: previewConversationMessage(lastMsg.type, lastMsg.content) },
         unreadCount,
         lastTime: lastMsg.createdAt.toISOString(),
       };
@@ -302,7 +321,7 @@ export async function getConversations(userId: string) {
         isGroup: true,
         memberCount: membership.group._count.members,
       },
-      lastMessage: lastMsg,
+      lastMessage: lastMsg ? { ...lastMsg, content: previewConversationMessage(lastMsg.type, lastMsg.content) } : null,
       unreadCount,
       lastTime: (lastMsg?.createdAt || membership.group.createdAt).toISOString(),
     };

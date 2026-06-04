@@ -17,9 +17,13 @@ function petAdoptPreview(content: string) {
 export function messagePreview(type: string, content = '', maxLength = Number.POSITIVE_INFINITY) {
   let preview = content;
   if (type === 'image') preview = '[\u56fe\u7247]';
+  if (type === 'emoji') preview = '[\u8868\u60c5\u5305]';
   if (type === 'voice') preview = '[\u8bed\u97f3]';
   if (type === 'video') preview = '[\u89c6\u9891]';
   if (type === 'call') preview = content || '[\u901a\u8bdd]';
   if (type === 'pet-adopt') preview = petAdoptPreview(content);
+  if (type === 'text' && /^\/uploads\//.test(content)) {
+    preview = /\/emojis?\//i.test(content) ? '[\u8868\u60c5\u5305]' : '[\u56fe\u7247]';
+  }
   return preview.length > maxLength ? `${preview.slice(0, maxLength)}...` : preview;
 }
