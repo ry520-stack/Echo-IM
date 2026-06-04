@@ -461,43 +461,41 @@ export default function RelationshipSpaceContent() {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[radial-gradient(circle_at_top,#ffe4ec_0,#fff7f9_34%,#ffffff_70%)] px-4 py-5 dark:bg-gray-950">
+    <div className="h-full overflow-y-auto bg-[#FFF7FA] px-4 py-4 dark:bg-gray-950">
       <div className="mx-auto max-w-lg space-y-4">
-        <section className="overflow-hidden rounded-[34px] bg-gradient-to-br from-rose-400 via-pink-400 to-fuchsia-500 text-white shadow-2xl shadow-rose-200/70 dark:shadow-none">
-          <div className="relative p-5">
-            <div className="absolute left-8 top-8 text-lg opacity-30 animate-pulse">{H}</div>
-            <div className="absolute right-10 top-16 text-2xl opacity-25 animate-bounce">{H}</div>
-            <div className="absolute bottom-20 left-1/2 text-sm opacity-30 animate-pulse">{H}</div>
-            <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/25 blur-3xl" />
-            <div className="absolute -bottom-16 left-8 h-40 w-40 rounded-full bg-fuchsia-300/35 blur-3xl" />
-            <div className="relative text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">{S.coupleSpace}</p>
-              <h2 className="mt-1 text-2xl font-black">{S.belong}</h2>
-            </div>
-            <div className="relative mt-5 flex items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-1 flex-col items-center">
-                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{user?.avatar ? <CachedImage src={assetUrl(user.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{(user?.nickname || user?.username || '\u6211')[0]}</div>}</div>
-                <p className="mt-2 max-w-full truncate text-sm font-bold">{user?.nickname || user?.username || '\u6211'}</p>
-                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{selfRole}</span>
-              </div>
-              <div className="flex shrink-0 flex-col items-center"><div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-3xl text-rose-500 shadow-xl shadow-rose-500/20">{H}</div><p className="mt-2 text-[11px] text-white/75">{S.sweet}</p></div>
-              <div className="flex min-w-0 flex-1 flex-col items-center">
-                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{summary.peer?.avatar ? <CachedImage src={assetUrl(summary.peer.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{peerName[0]}</div>}</div>
-                <p className="mt-2 max-w-full truncate text-sm font-bold">{peerName}</p>
-                <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{peerRole}</span>
-              </div>
-            </div>
-            <div className="relative mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-3xl bg-white/20 p-4 backdrop-blur"><p className="text-xs text-white/70">{S.met}</p><p className="mt-1 text-lg font-bold">{duration(summary.metAt)}</p></div>
-              <div className="rounded-3xl bg-white/20 p-4 backdrop-blur"><p className="text-xs text-white/70">{S.dating}</p><p className="mt-1 text-lg font-bold">{duration(summary.datingAt || summary.bondedAt)}</p></div>
-            </div>
-            <div className="relative mt-3 rounded-3xl bg-white/20 p-4 backdrop-blur"><p className="text-xs text-white/70">{summary.countdownTitle || S.nextDay}</p><p className="mt-1 text-xl font-black">{countdown(summary.countdownAt)}</p></div>
-          </div>
+        <section className="rounded-[20px] bg-white/80 p-4 shadow-sm ring-1 ring-rose-100/70 backdrop-blur dark:bg-gray-900/80 dark:ring-white/10">
+          <p className="text-xl font-black text-gray-950 dark:text-white">{S.coupleSpace}</p>
+          <p className="mt-1 text-xs font-medium text-gray-400">今日提示：留一点时间给彼此，哪怕只是一句想你。</p>
         </section>
 
-        <div className="grid grid-cols-4 gap-2 rounded-[26px] bg-white/80 p-2 shadow-sm backdrop-blur dark:bg-gray-900/80">
+        <section className="relative overflow-hidden rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+          <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br from-[#FF5F9E]/20 to-[#C86BFF]/20 blur-2xl" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-col items-center">
+              <div className="h-14 w-14 overflow-hidden rounded-2xl bg-rose-50 ring-2 ring-white shadow-sm">{user?.avatar ? <CachedImage src={assetUrl(user.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-lg font-black text-[#FF4F8B]">{(user?.nickname || user?.username || '\u6211')[0]}</div>}</div>
+              <p className="mt-1 max-w-full truncate text-xs font-bold text-gray-900 dark:text-white">{user?.nickname || user?.username || '\u6211'}</p>
+              <span className="mt-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold text-[#FF4F8B]">{selfRole}</span>
+            </div>
+            <div className="flex shrink-0 flex-col items-center">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#FF5F9E] to-[#C86BFF] text-xl text-white shadow-lg shadow-rose-200/60">{H}</div>
+              <p className="mt-1 text-[10px] font-semibold text-gray-400">{S.sweet}</p>
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col items-center">
+              <div className="h-14 w-14 overflow-hidden rounded-2xl bg-rose-50 ring-2 ring-white shadow-sm">{summary.peer?.avatar ? <CachedImage src={assetUrl(summary.peer.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-lg font-black text-[#FF4F8B]">{peerName[0]}</div>}</div>
+              <p className="mt-1 max-w-full truncate text-xs font-bold text-gray-900 dark:text-white">{peerName}</p>
+              <span className="mt-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-semibold text-[#FF4F8B]">{peerRole}</span>
+            </div>
+          </div>
+          <div className="relative mt-4 grid grid-cols-2 gap-3">
+            <div className="rounded-[20px] bg-[#FFF7FA] p-3"><p className="text-xs text-gray-400">{S.met}</p><p className="mt-1 text-base font-black text-gray-950">{duration(summary.metAt)}</p></div>
+            <div className="rounded-[20px] bg-[#FFF7FA] p-3"><p className="text-xs text-gray-400">{S.dating}</p><p className="mt-1 text-base font-black text-gray-950">{duration(summary.datingAt || summary.bondedAt)}</p></div>
+          </div>
+          <div className="relative mt-3 rounded-[20px] bg-gradient-to-r from-[#FF5F9E]/10 to-[#C86BFF]/10 p-3"><p className="text-xs text-gray-400">{summary.countdownTitle || S.nextDay}</p><p className="mt-1 text-base font-black text-gray-950">{countdown(summary.countdownAt)}</p></div>
+        </section>
+
+        <div className="grid grid-cols-4 gap-1 rounded-[20px] bg-white p-1.5 shadow-sm ring-1 ring-rose-100/70 backdrop-blur dark:bg-gray-900/80">
           {[['home', S.home, CalendarHeart], ['memory', S.memory, Camera], ['care', S.care, Umbrella], ['settings', S.settings, Settings]].map(([key, label, Icon]: any) => (
-            <button key={key} onClick={() => setSection(key)} className={`flex flex-col items-center gap-1 rounded-2xl py-2 text-xs transition-colors ${section === key ? 'bg-rose-500 text-white shadow-lg shadow-rose-200' : 'text-gray-400'}`}><Icon size={16} />{label}</button>
+            <button key={key} onClick={() => setSection(key)} className={`flex flex-col items-center gap-0.5 rounded-2xl py-2 text-[11px] transition-colors ${section === key ? 'bg-rose-50 text-[#FF4F8B]' : 'text-gray-400'}`}><Icon size={15} />{label}</button>
           ))}
         </div>
 
@@ -512,7 +510,45 @@ export default function RelationshipSpaceContent() {
         )}
 
         {section === 'memory' && (
-          <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
+          <>
+          <section className="space-y-4">
+            <div>
+              <p className="text-lg font-black text-gray-950 dark:text-white">回忆中心</p>
+              <p className="mt-1 text-xs text-gray-400">把照片、足迹、情歌和夸夸都收在这里。</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => { setMemoryTab('photo'); setAlbumOpen(true); }} className="col-span-2 rounded-[20px] bg-white p-4 text-left shadow-sm ring-1 ring-rose-100/70">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-sm font-black text-gray-950"><Camera size={17} className="text-[#FF4F8B]" />情侣相册</span>
+                  <span className="text-xs font-bold text-gray-400">{totalAlbumPhotos} 张照片</span>
+                </div>
+                {recentAlbumPhotos.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    {recentAlbumPhotos.slice(0, 4).map(({ url, item, imageIndex }, index) => (
+                      <span key={`${item.id}-${url}-${index}-${imageIndex}`} className="block aspect-square overflow-hidden rounded-xl bg-rose-50">
+                        <CachedImage src={assetUrl(url)} alt="" className="h-full w-full object-cover" />
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 flex h-20 items-center justify-center rounded-2xl bg-[#FFF7FA] text-xs font-bold text-[#FF4F8B]">去添加第一张照片</div>
+                )}
+              </button>
+              {[
+                ['footprint', '足迹地图', MapPin, '一起去过的地方'],
+                ['song', '情歌', Music, '属于你们的歌'],
+                ['praise', '夸夸墙', Sparkles, '把喜欢说出来'],
+                ['grudge', '小账本', Trash2, '轻轻记一笔'],
+              ].map(([key, title, Icon, desc]: any) => (
+                <button key={key} onClick={() => setMemoryTab(key)} className={`rounded-[20px] bg-white p-4 text-left shadow-sm ring-1 ring-rose-100/70 ${memoryTab === key ? 'ring-[#FF4F8B]/40' : ''}`}>
+                  <Icon size={18} className="text-[#FF4F8B]" />
+                  <p className="mt-2 text-sm font-black text-gray-950">{title}</p>
+                  <p className="mt-1 text-xs text-gray-400">{desc}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="hidden">
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{MEMORY_TABS.map(({ key, label, Icon }) => <button key={key} onClick={() => setMemoryTab(key)} className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs ${memoryTab === key ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><Icon size={13} />{label}</button>)}</div>
             {memoryTab === 'photo' ? (
               <div className="space-y-3">
@@ -571,9 +607,44 @@ export default function RelationshipSpaceContent() {
               );
             })}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>}
           </section>
+          </>
         )}
 
         {section === 'care' && (
+          <section className="space-y-4">
+            <div>
+              <p className="text-lg font-black text-gray-950 dark:text-white">关怀互动</p>
+              <p className="mt-1 text-xs text-gray-400">把想念、提醒和小决定做成轻一点的动作。</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button disabled={busy} onClick={() => act(() => api('POST', '/api/couples/sos'), '想你已发送')} className="rounded-[20px] bg-white p-3 text-left shadow-sm ring-1 ring-rose-100/80 transition active:scale-[0.98] disabled:opacity-50 dark:bg-gray-900 dark:ring-white/10">
+                <Send size={18} className="text-[#FF4F8B]" />
+                <p className="mt-2 text-xs font-black text-gray-900 dark:text-white">发一句想你</p>
+              </button>
+              <button onClick={() => toast('已记下：提醒对方喝水', 'info')} className="rounded-[20px] bg-white p-3 text-left shadow-sm ring-1 ring-rose-100/80 transition active:scale-[0.98] dark:bg-gray-900 dark:ring-white/10">
+                <Umbrella size={18} className="text-[#FF4F8B]" />
+                <p className="mt-2 text-xs font-black text-gray-900 dark:text-white">提醒喝水</p>
+              </button>
+              <button onClick={() => { const options = decisionOptions.split(/[,，、]/).map(value => value.trim()).filter(Boolean); setDecisionResult(options.length ? options[Math.floor(Math.random() * options.length)] : '先填几个候选项'); }} className="rounded-[20px] bg-white p-3 text-left shadow-sm ring-1 ring-rose-100/80 transition active:scale-[0.98] dark:bg-gray-900 dark:ring-white/10">
+                <Sparkles size={18} className="text-[#FF4F8B]" />
+                <p className="mt-2 text-xs font-black text-gray-900 dark:text-white">随机决定</p>
+              </button>
+            </div>
+            <section className="rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-gray-950 dark:text-white">{S.decision}</p>
+                  <p className="mt-1 text-xs text-gray-400">{S.decisionTip}</p>
+                </div>
+                {decisionResult && <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-[#FF4F8B]">{decisionResult}</span>}
+              </div>
+              <input value={decisionOptions} onChange={e => setDecisionOptions(e.target.value)} className="mt-3 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+            </section>
+            <RelationshipCarePanel myCycle={summary.myCycle} peerCycle={summary.peerCycle} currentSkin={summary.pet?.skin} onRefresh={() => load()} />
+          </section>
+        )}
+
+        {false && section === 'care' && (
           <>
             <RelationshipCarePanel myCycle={summary.myCycle} peerCycle={summary.peerCycle} currentSkin={summary.pet?.skin} onRefresh={() => load()} />
             <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
@@ -587,6 +658,45 @@ export default function RelationshipSpaceContent() {
         )}
 
         {section === 'settings' && (
+          <section className="space-y-4">
+            <div>
+              <p className="text-lg font-black text-gray-950 dark:text-white">空间设置</p>
+              <p className="mt-1 text-xs text-gray-400">资料、时间和关系操作分开管理，页面会轻很多。</p>
+            </div>
+            <div className="space-y-3 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+              <p className="text-sm font-black text-gray-950 dark:text-white">基础资料</p>
+              <input value={form.cityName} onChange={e => setForm({ ...form, cityName: e.target.value })} placeholder={S.cityPlaceholder} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <select value={gender} onChange={e => setGender(e.target.value)} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200">
+                <option value="">性别未设置</option>
+                <option value="male">男</option>
+                <option value="female">女</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+            <div className="space-y-3 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+              <p className="text-sm font-black text-gray-950 dark:text-white">情侣称呼</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input value={selfRole} onChange={e => setSelfRole(e.target.value)} placeholder={S.roleSelf} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                <input value={peerRole} onChange={e => setPeerRole(e.target.value)} placeholder={S.rolePeer} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              </div>
+            </div>
+            <div className="space-y-3 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+              <p className="text-sm font-black text-gray-950 dark:text-white">关系时间</p>
+              <label className="block text-xs text-gray-400">{S.met}<input type="datetime-local" value={form.metAt} onChange={e => setForm({ ...form, metAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
+              <label className="block text-xs text-gray-400">{S.dating}<input type="datetime-local" value={form.datingAt} onChange={e => setForm({ ...form, datingAt: e.target.value })} className="mt-1 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" /></label>
+              <input value={form.countdownTitle} onChange={e => setForm({ ...form, countdownTitle: e.target.value })} placeholder={S.nextDay} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+              <input type="datetime-local" value={form.countdownAt} onChange={e => setForm({ ...form, countdownAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" />
+            </div>
+            <div className="space-y-2 rounded-[20px] bg-white p-4 shadow-sm ring-1 ring-rose-100/80 dark:bg-gray-900 dark:ring-white/10">
+              <p className="text-sm font-black text-gray-950 dark:text-white">情侣设置</p>
+              <button disabled={busy} onClick={() => act(() => api('PATCH', '/api/couples', { ...form, gender, myLabel: selfRole, peerLabel: peerRole }), S.settingsSaved)} className="w-full rounded-2xl bg-[#FF4F8B] py-3 text-sm font-bold text-white disabled:opacity-50">{S.saveSettings}</button>
+              <button disabled={!summary.canUnbind || busy} onClick={() => { if (window.confirm('\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u540e\uff0c\u60c5\u4fa3\u7a7a\u95f4\u5c06\u5173\u95ed\u3002\u786e\u5b9a\u7ee7\u7eed\uff1f') && window.confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u771f\u7684\u8981\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u5417\uff1f')) act(() => api('POST', '/api/couples/unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u89e3\u9664'); }} className="w-full rounded-2xl py-2 text-xs text-red-500 disabled:text-gray-400">{summary.canUnbind ? S.unbind : `\u7ed1\u5b9a 90 \u5929\u5185\u4e0d\u53ef\u4e3b\u52a8\u89e3\u9664 · ${summary.unlockAt ? new Date(summary.unlockAt || '').toLocaleString() : ''}`}</button>
+              <button disabled={busy} onClick={() => { if (window.confirm('\u4ec5\u5728\u62c9\u9ed1\u6216\u8d26\u53f7\u6ce8\u9500\u7b49\u7279\u6b8a\u60c5\u51b5\u4e0b\u4f7f\u7528\u3002\u786e\u5b9a\u7533\u8bf7\u5f3a\u5236\u89e3\u9664\uff1f')) act(() => api('POST', '/api/couples/force-unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u5f3a\u5236\u89e3\u9664'); }} className="w-full rounded-2xl py-1 text-xs text-gray-400">{S.forceUnbind}</button>
+            </div>
+          </section>
+        )}
+
+        {false && section === 'settings' && (
           <section className="space-y-3 rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
             <input value={form.cityName} onChange={e => setForm({ ...form, cityName: e.target.value })} placeholder={S.cityPlaceholder} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             <select value={gender} onChange={e => setGender(e.target.value)} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200">
@@ -604,7 +714,7 @@ export default function RelationshipSpaceContent() {
             <input value={form.countdownTitle} onChange={e => setForm({ ...form, countdownTitle: e.target.value })} placeholder={S.nextDay} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
             <input type="datetime-local" value={form.countdownAt} onChange={e => setForm({ ...form, countdownAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm text-gray-700 outline-none dark:bg-gray-800 dark:text-gray-200" />
             <button disabled={busy} onClick={() => act(() => api('PATCH', '/api/couples', { ...form, gender, myLabel: selfRole, peerLabel: peerRole }), S.settingsSaved)} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white">{S.saveSettings}</button>
-            <button disabled={!summary.canUnbind || busy} onClick={() => { if (window.confirm('\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u540e\uff0c\u60c5\u4fa3\u7a7a\u95f4\u5c06\u5173\u95ed\u3002\u786e\u5b9a\u7ee7\u7eed\uff1f') && window.confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u771f\u7684\u8981\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u5417\uff1f')) act(() => api('POST', '/api/couples/unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u89e3\u9664'); }} className="w-full rounded-2xl py-2 text-xs text-red-500 disabled:text-gray-400">{summary.canUnbind ? S.unbind : `\u7ed1\u5b9a 90 \u5929\u5185\u4e0d\u53ef\u4e3b\u52a8\u89e3\u9664 · ${summary.unlockAt ? new Date(summary.unlockAt).toLocaleString() : ''}`}</button>
+            <button disabled={!summary.canUnbind || busy} onClick={() => { if (window.confirm('\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u540e\uff0c\u60c5\u4fa3\u7a7a\u95f4\u5c06\u5173\u95ed\u3002\u786e\u5b9a\u7ee7\u7eed\uff1f') && window.confirm('\u8bf7\u518d\u6b21\u786e\u8ba4\uff1a\u771f\u7684\u8981\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb\u5417\uff1f')) act(() => api('POST', '/api/couples/unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u89e3\u9664'); }} className="w-full rounded-2xl py-2 text-xs text-red-500 disabled:text-gray-400">{summary.canUnbind ? S.unbind : `\u7ed1\u5b9a 90 \u5929\u5185\u4e0d\u53ef\u4e3b\u52a8\u89e3\u9664 · ${summary.unlockAt ? new Date(summary.unlockAt || '').toLocaleString() : ''}`}</button>
             <button disabled={busy} onClick={() => { if (window.confirm('\u4ec5\u5728\u62c9\u9ed1\u6216\u8d26\u53f7\u6ce8\u9500\u7b49\u7279\u6b8a\u60c5\u51b5\u4e0b\u4f7f\u7528\u3002\u786e\u5b9a\u7533\u8bf7\u5f3a\u5236\u89e3\u9664\uff1f')) act(() => api('POST', '/api/couples/force-unbind'), '\u60c5\u4fa3\u5173\u7cfb\u5df2\u5f3a\u5236\u89e3\u9664'); }} className="w-full rounded-2xl py-1 text-xs text-gray-400">{S.forceUnbind}</button>
           </section>
         )}
