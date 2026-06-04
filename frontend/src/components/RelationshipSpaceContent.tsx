@@ -126,10 +126,9 @@ const S = {
   settingsSaved: '\u60c5\u4fa3\u7a7a\u95f4\u8bbe\u7f6e\u5df2\u4fdd\u5b58',
   roleSelf: '\u6211\u7684\u79f0\u547c',
   rolePeer: '\u5bf9\u65b9\u79f0\u547c',
-  albumPage: '\u60c5\u4fa3\u76f8\u518c',
+  albumPage: '\u6211\u4eec\u7684\u56de\u5fc6',
   openAlbum: '\u6253\u5f00\u60c5\u4fa3\u76f8\u518c',
-  originalUpload: '\u539f\u56fe\u4e0a\u4f20\uff0c\u4e0d\u538b\u7f29\u753b\u8d28',
-  batchAdd: '\u6279\u91cf\u6dfb\u52a0',
+  batchAdd: '\u4e0a\u4f20',
   photoWall: '\u7167\u7247\u5899',
   uploading: '\u6b63\u5728\u4e0a\u4f20',
   uploaded: '\u7167\u7247\u5df2\u52a0\u5165\u60c5\u4fa3\u76f8\u518c',
@@ -191,6 +190,12 @@ function albumDateLabel(key: string) {
   const date = new Date(`${key}T00:00:00`);
   return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
+function albumLocation(item: CoupleItem) {
+  return item.cityName?.trim() || '未设置地点';
+}
+function albumTag(item: CoupleItem) {
+  return (item.content || '日常').trim();
+}
 function songUrl(item: CoupleItem) {
   return [item.content, item.title].find(value => /^https?:\/\//i.test((value || '').trim()))?.trim() || '';
 }
@@ -230,9 +235,11 @@ export default function RelationshipSpaceContent() {
   const [decisionOptions, setDecisionOptions] = useState('\u706b\u9505\u3001\u7535\u5f71\u3001\u6563\u6b65\u3001\u5976\u8336');
   const [decisionResult, setDecisionResult] = useState('');
   const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumFilter, setAlbumFilter] = useState('全部');
   const [albumView, setAlbumView] = useState<'all' | 'tags'>('all');
+  const [albumDetailGroupKey, setAlbumDetailGroupKey] = useState<string | null>(null);
   const [pendingAlbumFiles, setPendingAlbumFiles] = useState<File[]>([]);
-  const [albumDraft, setAlbumDraft] = useState({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10) });
+  const [albumDraft, setAlbumDraft] = useState({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10), tag: '日常' });
   const [albumUploading, setAlbumUploading] = useState(false);
   const [albumProgress, setAlbumProgress] = useState({ done: 0, total: 0 });
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; item: CoupleItem; imageIndex: number } | null>(null);
@@ -283,18 +290,34 @@ export default function RelationshipSpaceContent() {
   const selectedFriend = friends.find(friend => friend.peer.id === selectedPeerId);
   const visibleItems = items.filter(item => item.type === memoryTab);
   const photoItems = items.filter(item => item.type === 'photo');
-  const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
+  const filteredPhotoItems = albumFilter === '全部' ? photoItems : photoItems.filter(item => (item.content || '日常') === albumFilter);
+  const albumPhotos = filteredPhotoItems.flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
+  const totalAlbumPhotos = photoItems.reduce((total, item) => total + imagesOf(item).length, 0);
   const recentAlbumPhotos = albumPhotos.slice(0, 8);
+  const groupTitle = (item: CoupleItem) => {
+    const title = (item.title || '').trim();
+    if (title && !/^共同回忆\s*\d+\s*张$/.test(title)) return title;
+    return item.cityName || '甜蜜回忆';
+  };
   const albumDateGroups = useMemo(() => {
-    const map = new Map<string, typeof albumPhotos>();
-    for (const photo of albumPhotos) {
-      const key = albumDateKey(photo.item.happenedAt);
-      map.set(key, [...(map.get(key) || []), photo]);
+    const map = new Map<string, { key: string; dateKey: string; dateLabel: string; location: string; title: string; photos: typeof albumPhotos; items: CoupleItem[] }>();
+    for (const item of filteredPhotoItems) {
+      const dateKey = albumDateKey(item.happenedAt);
+      const location = albumLocation(item);
+      const key = `${dateKey}::${location}`;
+      const photos = imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex }));
+      const current = map.get(key);
+      if (current) {
+        current.photos.push(...photos);
+        current.items.push(item);
+        if (current.title === '甜蜜回忆' && groupTitle(item) !== '甜蜜回忆') current.title = groupTitle(item);
+      } else {
+        map.set(key, { key, dateKey, dateLabel: albumDateLabel(dateKey), location, title: groupTitle(item), photos, items: [item] });
+      }
     }
-    return [...map.entries()]
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([key, photos]) => ({ key, label: albumDateLabel(key), photos }));
-  }, [albumPhotos]);
+    return [...map.values()].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  }, [filteredPhotoItems]);
+  const albumDetailGroup = albumDateGroups.find(group => group.key === albumDetailGroupKey) || null;
 
   const uploadOnePhoto = async (file: File) => {
     const data = new FormData();
@@ -313,18 +336,13 @@ export default function RelationshipSpaceContent() {
     } catch (error: any) { toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error'); }
     finally { setBusy(false); }
   };
-  const groupTitle = (item: CoupleItem) => {
-    const title = (item.title || '').trim();
-    if (title && !/^共同回忆\s*\d+\s*张$/.test(title)) return title;
-    return item.cityName || '甜蜜回忆';
-  };
   const queueAlbumFiles = (filesLike: FileList | File[]) => {
     const files = Array.from(filesLike).filter(file => file.type.startsWith('image/')).slice(0, 80);
     if (!files.length) return;
     setPendingAlbumFiles(files);
-    setAlbumDraft({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10) });
+    setAlbumDraft({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10), tag: '日常' });
   };
-  const uploadAlbumFiles = async (filesLike: FileList | File[], meta?: { title?: string; cityName?: string; happenedAt?: string }) => {
+  const uploadAlbumFiles = async (filesLike: FileList | File[], meta?: { title?: string; cityName?: string; happenedAt?: string; tag?: string }) => {
     const files = Array.from(filesLike).filter(file => file.type.startsWith('image/')).slice(0, 80);
     if (!files.length) return;
     setAlbumUploading(true);
@@ -339,13 +357,13 @@ export default function RelationshipSpaceContent() {
       await api('POST', '/api/couples/items', {
         type: 'photo',
         title: String(meta?.title || '').trim() || (files.length > 1 ? `\u5171\u540c\u56de\u5fc6 ${files.length} \u5f20` : (files[0]?.name || S.albumPage)),
-        content: '',
+        content: String(meta?.tag || '日常').trim(),
         cityName: String(meta?.cityName || '').trim(),
         happenedAt: meta?.happenedAt || new Date().toISOString(),
         images: urls,
       });
       await loadItems();
-      setAlbumView(meta?.title || meta?.cityName ? 'tags' : 'all');
+      setAlbumFilter(meta?.tag || '全部');
       toast(`${files.length} \u5f20${S.uploaded}`, 'success');
     } catch (error: any) {
       toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error');
@@ -591,21 +609,29 @@ export default function RelationshipSpaceContent() {
           </section>
         )}
         {albumOpen && (
-          <div data-relationship-gesture-lock className="fixed inset-0 z-[90] overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,#ffe0ec_0,#fff8fb_42%,#ffffff_75%)] dark:bg-gray-950">
-            <div className="sticky top-0 z-10 border-b border-white/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
+          <div data-relationship-gesture-lock className="fixed inset-0 z-[90] overflow-y-auto overscroll-contain bg-[#FFF7FA] text-gray-950 dark:bg-gray-950 dark:text-white">
+            <div className="sticky top-0 z-10 border-b border-white/70 bg-[#FFF7FA]/92 px-4 py-3 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
               <div className="mx-auto flex max-w-lg items-center justify-between">
-                <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 rounded-full bg-white/70 px-3 py-2 text-sm font-semibold text-gray-500 shadow-sm"><X size={18} />{S.close}</button>
+                <button onClick={() => { albumDetailGroupKey ? setAlbumDetailGroupKey(null) : setAlbumOpen(false); }} className="flex items-center gap-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-gray-500 shadow-sm"><X size={18} />{albumDetailGroupKey ? '返回' : '关闭'}</button>
                 <div className="text-center">
-                  <h2 className="text-lg font-black text-gray-900 dark:text-white">{S.albumPage}</h2>
+                  <h2 className="text-xl font-black tracking-tight">{albumDetailGroup ? albumDetailGroup.title : S.albumPage}</h2>
+                  {!albumDetailGroup && <p className="mt-0.5 text-xs font-semibold text-gray-400">{totalAlbumPhotos}张照片 · {photoItems.length}段回忆</p>}
                 </div>
-                <label className="flex cursor-pointer items-center gap-1 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-rose-200">
-                  <Plus size={14} />{S.batchAdd}
+                <label className="flex cursor-pointer items-center gap-1 rounded-full bg-[#FF4F8B] px-3 py-2 text-xs font-bold text-white shadow-lg shadow-rose-200">
+                  <Plus size={14} />上传
                   <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) queueAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
                 </label>
               </div>
             </div>
-            <div className="mx-auto max-w-lg p-3">
-              <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl bg-white/70 p-1 shadow-sm">
+            <div className="mx-auto max-w-lg px-4 py-4">
+              {!albumDetailGroup && (
+                <div data-relationship-gesture-lock className="mb-5 flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [touch-action:pan-x]">
+                  {['全部', '合照', '约会', '旅行', '日常'].map(label => (
+                    <button key={label} onClick={() => setAlbumFilter(label)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-colors ${albumFilter === label ? 'bg-[#FF4F8B] text-white shadow-lg shadow-rose-200/70' : 'bg-white text-gray-500 shadow-sm'}`}>{label}</button>
+                  ))}
+                </div>
+              )}
+              <div className="hidden">
                 <button onClick={() => setAlbumView('all')} className={`rounded-xl py-2 text-sm font-bold ${albumView === 'all' ? 'bg-rose-500 text-white shadow' : 'text-gray-500'}`}>全部</button>
                 <button onClick={() => setAlbumView('tags')} className={`rounded-xl py-2 text-sm font-bold ${albumView === 'tags' ? 'bg-rose-500 text-white shadow' : 'text-gray-500'}`}>标签</button>
               </div>
@@ -648,18 +674,28 @@ export default function RelationshipSpaceContent() {
                   })}
                 </div>
               ) : (
-                <div className="space-y-5">
-                  {albumDateGroups.map(group => (
-                    <section key={group.key}>
-                      <div className="sticky top-[68px] z-[1] mb-3 flex items-center gap-3 rounded-full bg-white/80 px-3 py-2 text-xs font-bold text-gray-500 shadow-sm backdrop-blur">
+                <div className="space-y-6">
+                  {(albumDetailGroup ? [albumDetailGroup] : albumDateGroups).map(group => (
+                    <section key={group.key} className="rounded-[24px] bg-white p-3 shadow-sm ring-1 ring-rose-100/70">
+                      <button onClick={() => setAlbumDetailGroupKey(group.key)} className="mb-3 block w-full text-left">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-lg font-black text-gray-950">{group.dateLabel}</p>
+                            <p className="mt-1 text-sm font-semibold text-gray-500">{group.location}</p>
+                            <p className="mt-1 text-sm font-bold text-gray-900">{group.title} · {group.photos.length}张</p>
+                          </div>
+                          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-[#FF4F8B]">{albumTag(group.items[0])}</span>
+                        </div>
+                      </button>
+                      <div className="hidden">
                         <span className="h-2 w-2 rounded-full bg-rose-400" />
-                        <span>{group.label}</span>
+                        <span>{group.dateLabel}</span>
                         <span className="ml-auto text-gray-300">{group.photos.length} 张</span>
                       </div>
-                      <div className="columns-2 gap-3 [column-fill:_balance]">
+                      <div className="columns-2 gap-2 [column-fill:_balance]">
                         {group.photos.map(({ url, item, imageIndex }, index) => (
-                          <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
-                            <CachedImage src={assetUrl(url)} alt="" className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
+                          <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="mb-2 block w-full break-inside-avoid overflow-hidden rounded-xl bg-rose-50 transition-transform active:scale-[0.98]">
+                            <CachedImage src={assetUrl(url)} alt="" className={`${masonryTone(index)} w-full object-cover`} />
                           </button>
                         ))}
                       </div>
@@ -687,18 +723,21 @@ export default function RelationshipSpaceContent() {
             <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" onClick={() => setPendingAlbumFiles([])} />
             <div className="relative w-full max-w-lg rounded-t-[30px] bg-white p-5 shadow-2xl dark:bg-gray-900">
               <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200" />
-              <h3 className="text-xl font-black text-gray-900 dark:text-white">给这组照片加标签</h3>
-              <p className="mt-1 text-xs text-gray-400">已选择 {pendingAlbumFiles.length} 张照片</p>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white">{'\u4e0a\u4f20\u4e00\u6bb5\u56de\u5fc6'}</h3>
+              <p className="mt-1 text-xs text-gray-400">{'\u5df2\u9009\u62e9'} {pendingAlbumFiles.length} {'\u5f20\u7167\u7247\uff0c\u4fdd\u5b58\u540e\u4f1a\u6309\u62cd\u6444\u65e5\u671f\u548c\u5730\u70b9\u81ea\u52a8\u5206\u7ec4\u3002'}</p>
               <div className="mt-4 space-y-3">
-                <input value={albumDraft.title} onChange={e => setAlbumDraft({ ...albumDraft, title: e.target.value })} placeholder="标签，例如：沈阳、生日、第一次见面" className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                <input value={albumDraft.title} onChange={e => setAlbumDraft({ ...albumDraft, title: e.target.value })} placeholder={'\u56de\u5fc6\u6807\u9898\uff0c\u6bd4\u5982\uff1a\u4e00\u8d77\u51fa\u53bb\u73a9\u7684\u90a3\u5929'} className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                <input value={albumDraft.cityName} onChange={e => setAlbumDraft({ ...albumDraft, cityName: e.target.value })} placeholder={'\u5730\u70b9\uff0c\u6bd4\u5982\uff1a\u90d1\u5dde \u00b7 \u4e8c\u4e03\u5e7f\u573a'} className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
                 <div className="grid grid-cols-2 gap-3">
-                  <input value={albumDraft.cityName} onChange={e => setAlbumDraft({ ...albumDraft, cityName: e.target.value })} placeholder="地点" className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
                   <input type="date" value={albumDraft.happenedAt} onChange={e => setAlbumDraft({ ...albumDraft, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                  <select value={albumDraft.tag} onChange={e => setAlbumDraft({ ...albumDraft, tag: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200">
+                    {['\u5408\u7167', '\u7ea6\u4f1a', '\u65c5\u884c', '\u65e5\u5e38'].map(tag => <option key={tag} value={tag}>{tag}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-3">
-                <button onClick={() => setPendingAlbumFiles([])} className="rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-500 dark:bg-gray-800">取消</button>
-                <button disabled={busy} onClick={submitQueuedAlbum} className="rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-50">保存</button>
+                <button onClick={() => setPendingAlbumFiles([])} className="rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-500 dark:bg-gray-800">{'\u53d6\u6d88'}</button>
+                <button disabled={busy} onClick={submitQueuedAlbum} className="rounded-2xl bg-[#FF4F8B] py-3 text-sm font-bold text-white disabled:opacity-50">{'\u4fdd\u5b58'}</button>
               </div>
             </div>
           </div>
@@ -708,4 +747,3 @@ export default function RelationshipSpaceContent() {
     </div>
   );
 }
-
