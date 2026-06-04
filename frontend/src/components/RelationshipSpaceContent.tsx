@@ -220,6 +220,9 @@ export default function RelationshipSpaceContent() {
   const [decisionOptions, setDecisionOptions] = useState('\u706b\u9505\u3001\u7535\u5f71\u3001\u6563\u6b65\u3001\u5976\u8336');
   const [decisionResult, setDecisionResult] = useState('');
   const [albumOpen, setAlbumOpen] = useState(false);
+  const [albumView, setAlbumView] = useState<'all' | 'tags'>('all');
+  const [pendingAlbumFiles, setPendingAlbumFiles] = useState<File[]>([]);
+  const [albumDraft, setAlbumDraft] = useState({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10) });
   const [albumUploading, setAlbumUploading] = useState(false);
   const [albumProgress, setAlbumProgress] = useState({ done: 0, total: 0 });
   const [previewPhoto, setPreviewPhoto] = useState<{ url: string; item: CoupleItem; imageIndex: number } | null>(null);
@@ -261,6 +264,7 @@ export default function RelationshipSpaceContent() {
   const peerName = useMemo(() => nameOf(summary.peer), [summary.peer]);
   const selectedFriend = friends.find(friend => friend.peer.id === selectedPeerId);
   const visibleItems = items.filter(item => item.type === memoryTab);
+  const photoItems = items.filter(item => item.type === 'photo');
   const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
 
   const uploadOnePhoto = async (file: File) => {
@@ -280,7 +284,18 @@ export default function RelationshipSpaceContent() {
     } catch (error: any) { toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error'); }
     finally { setBusy(false); }
   };
-  const uploadAlbumFiles = async (filesLike: FileList | File[]) => {
+  const groupTitle = (item: CoupleItem) => {
+    const title = (item.title || '').trim();
+    if (title && !/^共同回忆\s*\d+\s*张$/.test(title)) return title;
+    return item.cityName || '甜蜜回忆';
+  };
+  const queueAlbumFiles = (filesLike: FileList | File[]) => {
+    const files = Array.from(filesLike).filter(file => file.type.startsWith('image/')).slice(0, 80);
+    if (!files.length) return;
+    setPendingAlbumFiles(files);
+    setAlbumDraft({ title: '', cityName: '', happenedAt: new Date().toISOString().slice(0, 10) });
+  };
+  const uploadAlbumFiles = async (filesLike: FileList | File[], meta?: { title?: string; cityName?: string; happenedAt?: string }) => {
     const files = Array.from(filesLike).filter(file => file.type.startsWith('image/')).slice(0, 80);
     if (!files.length) return;
     setAlbumUploading(true);
@@ -294,13 +309,14 @@ export default function RelationshipSpaceContent() {
       }
       await api('POST', '/api/couples/items', {
         type: 'photo',
-        title: files.length > 1 ? `\u5171\u540c\u56de\u5fc6 ${files.length} \u5f20` : (files[0]?.name || S.albumPage),
+        title: String(meta?.title || '').trim() || (files.length > 1 ? `\u5171\u540c\u56de\u5fc6 ${files.length} \u5f20` : (files[0]?.name || S.albumPage)),
         content: '',
-        cityName: '',
-        happenedAt: new Date().toISOString(),
+        cityName: String(meta?.cityName || '').trim(),
+        happenedAt: meta?.happenedAt || new Date().toISOString(),
         images: urls,
       });
       await loadItems();
+      setAlbumView(meta?.title || meta?.cityName ? 'tags' : 'all');
       toast(`${files.length} \u5f20${S.uploaded}`, 'success');
     } catch (error: any) {
       toast(error.message || '\u4e0a\u4f20\u5931\u8d25', 'error');
@@ -309,6 +325,11 @@ export default function RelationshipSpaceContent() {
       setBusy(false);
       setAlbumProgress({ done: 0, total: 0 });
     }
+  };
+  const submitQueuedAlbum = async () => {
+    const files = pendingAlbumFiles;
+    setPendingAlbumFiles([]);
+    await uploadAlbumFiles(files, albumDraft);
   };
   const createItem = () => act(async () => {
     await api('POST', '/api/couples/items', { ...itemForm, type: memoryTab });
@@ -448,23 +469,25 @@ export default function RelationshipSpaceContent() {
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{MEMORY_TABS.map(({ key, label, Icon }) => <button key={key} onClick={() => setMemoryTab(key)} className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs ${memoryTab === key ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><Icon size={13} />{label}</button>)}</div>
             {memoryTab === 'photo' && <button onClick={() => setAlbumOpen(true)} className="mb-3 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-4 py-3 text-left text-sm font-bold text-white shadow-lg shadow-rose-200/60"><span>{S.openAlbum}</span><span className="text-xs font-medium text-white/75">{albumPhotos.length} photos</span></button>}
             {memoryTab === 'photo' && <p className="mb-2 text-xs text-gray-400">{S.originalUpload}</p>}
-            {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{memoryTab === 'photo' ? S.batchAdd : S.addPhoto}<input type="file" accept="image/*" multiple={memoryTab === 'photo'} className="hidden" onChange={e => { if (!e.target.files) return; memoryTab === 'photo' ? uploadAlbumFiles(e.target.files) : e.target.files[0] && uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
+            {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{memoryTab === 'photo' ? S.batchAdd : S.addPhoto}<input type="file" accept="image/*" multiple={memoryTab === 'photo'} className="hidden" onChange={e => { if (!e.target.files) return; memoryTab === 'photo' ? queueAlbumFiles(e.target.files) : e.target.files[0] && uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
             {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
             <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{(memoryTab === 'photo' || memoryTab === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
             <div className="mt-4 space-y-3">{visibleItems.map(item => {
               const photos = imagesOf(item);
-              const first = photos[0];
               return (
                 <div key={item.id} className="overflow-hidden rounded-[26px] bg-white shadow-sm ring-1 ring-black/5 dark:bg-gray-800/70">
                   {photos.length > 0 && (
-                    <button onClick={() => setAlbumOpen(true)} className="block w-full text-left">
-                      {first && <CachedImage src={assetUrl(first)} alt="" className="h-56 w-full object-cover" />}
-                      {photos.length > 1 && <div className="grid grid-cols-4 gap-1 p-2">{photos.slice(1, 5).map(url => <CachedImage key={url} src={assetUrl(url)} alt="" className="h-20 w-full rounded-xl object-cover" />)}</div>}
-                    </button>
+                    <div className="flex gap-2 overflow-x-auto p-3 pb-1">
+                      {photos.map((url, index) => (
+                        <button key={url} onClick={() => { setAlbumOpen(true); setPreviewPhoto({ url, item, imageIndex: index }); }} className="shrink-0 overflow-hidden rounded-2xl">
+                          <CachedImage src={assetUrl(url)} alt="" className="h-40 w-32 object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   )}
                   <div className="flex items-start justify-between gap-2 p-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-black text-gray-800 dark:text-gray-100">{item.title || item.cityName || '\u672a\u547d\u540d\u8bb0\u5f55'}</p>
+                      <p className="text-base font-black text-gray-800 dark:text-gray-100">{groupTitle(item)}</p>
                       <p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>
                       {memoryTab === 'song' && songUrl(item) && <audio className="mt-2 h-9 w-full" controls preload="none" src={songUrl(item)} />}
                       {item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}
@@ -519,15 +542,18 @@ export default function RelationshipSpaceContent() {
                 <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 rounded-full bg-white/70 px-3 py-2 text-sm font-semibold text-gray-500 shadow-sm"><X size={18} />{S.close}</button>
                 <div className="text-center">
                   <h2 className="text-lg font-black text-gray-900 dark:text-white">{S.albumPage}</h2>
-                  <p className="text-[11px] text-gray-400">{S.photoWall}</p>
                 </div>
                 <label className="flex cursor-pointer items-center gap-1 rounded-full bg-rose-500 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-rose-200">
                   <Plus size={14} />{S.batchAdd}
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) uploadAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) queueAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
                 </label>
               </div>
             </div>
             <div className="mx-auto max-w-lg p-3">
+              <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl bg-white/70 p-1 shadow-sm">
+                <button onClick={() => setAlbumView('all')} className={`rounded-xl py-2 text-sm font-bold ${albumView === 'all' ? 'bg-rose-500 text-white shadow' : 'text-gray-500'}`}>全部</button>
+                <button onClick={() => setAlbumView('tags')} className={`rounded-xl py-2 text-sm font-bold ${albumView === 'tags' ? 'bg-rose-500 text-white shadow' : 'text-gray-500'}`}>标签</button>
+              </div>
               {albumUploading && (
                 <div className="mb-3 rounded-2xl bg-rose-500/90 p-3 text-xs font-semibold text-white shadow-lg shadow-rose-200/60">
                   <div className="mb-2 flex items-center justify-between"><span>{S.uploading}</span><span>{albumProgress.done}/{albumProgress.total}</span></div>
@@ -539,8 +565,33 @@ export default function RelationshipSpaceContent() {
                   <ImagePlus className="text-rose-400" size={34} />
                   <p className="mt-3 text-sm font-bold text-gray-700">{S.noPhoto}</p>
                   <p className="mt-1 text-xs text-gray-400">{S.batchAdd}</p>
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) uploadAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={e => { if (e.target.files) queueAlbumFiles(e.target.files); e.currentTarget.value = ''; }} />
                 </label>
+              ) : albumView === 'tags' ? (
+                <div className="space-y-4">
+                  {photoItems.map(item => {
+                    const photos = imagesOf(item);
+                    if (!photos.length) return null;
+                    return (
+                      <section key={item.id} className="rounded-[28px] bg-white/85 p-3 shadow-sm ring-1 ring-black/5">
+                        <div className="mb-3 flex items-end justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-black text-gray-900">{groupTitle(item)}</h3>
+                            <p className="mt-0.5 text-xs text-gray-400">{[item.cityName, item.happenedAt ? new Date(item.happenedAt).toLocaleDateString() : '', `${photos.length} 张`].filter(Boolean).join(' · ')}</p>
+                          </div>
+                          <button onClick={() => archiveItem(item.id)} className="rounded-full p-2 text-gray-300 hover:bg-red-50 hover:text-red-400"><Trash2 size={16} /></button>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {photos.map((url, imageIndex) => (
+                            <button key={url} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="shrink-0 overflow-hidden rounded-2xl">
+                              <CachedImage src={assetUrl(url)} alt="" className="h-44 w-32 object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="columns-2 gap-3 [column-fill:_balance]">
                   {albumPhotos.map(({ url, item, imageIndex }, index) => (
@@ -563,6 +614,27 @@ export default function RelationshipSpaceContent() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {pendingAlbumFiles.length > 0 && (
+          <div className="fixed inset-0 z-[110] flex items-end justify-center">
+            <div className="absolute inset-0 bg-black/35 backdrop-blur-sm" onClick={() => setPendingAlbumFiles([])} />
+            <div className="relative w-full max-w-lg rounded-t-[30px] bg-white p-5 shadow-2xl dark:bg-gray-900">
+              <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-gray-200" />
+              <h3 className="text-xl font-black text-gray-900 dark:text-white">给这组照片加标签</h3>
+              <p className="mt-1 text-xs text-gray-400">已选择 {pendingAlbumFiles.length} 张照片</p>
+              <div className="mt-4 space-y-3">
+                <input value={albumDraft.title} onChange={e => setAlbumDraft({ ...albumDraft, title: e.target.value })} placeholder="标签，例如：沈阳、生日、第一次见面" className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input value={albumDraft.cityName} onChange={e => setAlbumDraft({ ...albumDraft, cityName: e.target.value })} placeholder="地点" className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                  <input type="date" value={albumDraft.happenedAt} onChange={e => setAlbumDraft({ ...albumDraft, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />
+                </div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button onClick={() => setPendingAlbumFiles([])} className="rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-500 dark:bg-gray-800">取消</button>
+                <button disabled={busy} onClick={submitQueuedAlbum} className="rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-50">保存</button>
+              </div>
+            </div>
           </div>
         )}
         <button onClick={() => load()} className="mx-auto flex items-center gap-1 py-2 text-xs text-gray-400"><RefreshCw size={13} />{S.refresh}</button>
