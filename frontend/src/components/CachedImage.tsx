@@ -1,4 +1,4 @@
-import { ImgHTMLAttributes, useEffect, useRef, useState } from 'react';
+import { ImgHTMLAttributes, RefObject, useEffect, useRef, useState } from 'react';
 
 const CACHE_NAME = 'echo-photo-cache-v1';
 
@@ -7,7 +7,7 @@ interface CachedImageProps extends ImgHTMLAttributes<HTMLImageElement> {
 }
 
 export default function CachedImage({ src, alt = '', className = '', ...props }: CachedImageProps) {
-  const imgRef = useRef<HTMLImageElement | null>(null);
+  const imgRef = useRef<HTMLElement | null>(null);
   const objectUrlRef = useRef('');
   const [active, setActive] = useState(false);
   const [resolvedSrc, setResolvedSrc] = useState('');
@@ -68,14 +68,22 @@ export default function CachedImage({ src, alt = '', className = '', ...props }:
   }, []);
 
   return (
-    <img
-      ref={imgRef}
-      src={resolvedSrc || undefined}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      className={`${className} ${resolvedSrc ? '' : 'bg-gradient-to-br from-rose-50 via-white to-pink-50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800'}`}
-      {...props}
-    />
+    resolvedSrc ? (
+      <img
+        ref={imgRef as RefObject<HTMLImageElement>}
+        src={resolvedSrc}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        className={className}
+        {...props}
+      />
+    ) : (
+      <div
+        ref={imgRef as RefObject<HTMLDivElement>}
+        className={`${className} bg-gradient-to-br from-rose-50 via-white to-pink-50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800`}
+        aria-hidden="true"
+      />
+    )
   );
 }

@@ -134,6 +134,9 @@ const S = {
   uploading: '\u6b63\u5728\u4e0a\u4f20',
   uploaded: '\u7167\u7247\u5df2\u52a0\u5165\u60c5\u4fa3\u76f8\u518c',
   tapPreview: '\u70b9\u51fb\u7167\u7247\u67e5\u770b\u539f\u56fe',
+  movePrev: '\u524d\u79fb',
+  moveNext: '\u540e\u79fb',
+  orderSaved: '\u7167\u7247\u987a\u5e8f\u5df2\u4fdd\u5b58',
   noPhoto: '\u8fd8\u6ca1\u6709\u7167\u7247',
   close: '\u5173\u95ed',
   unbind: '\u89e3\u9664\u60c5\u4fa3\u5173\u7cfb',
@@ -219,7 +222,7 @@ export default function RelationshipSpaceContent() {
   const [albumOpen, setAlbumOpen] = useState(false);
   const [albumUploading, setAlbumUploading] = useState(false);
   const [albumProgress, setAlbumProgress] = useState({ done: 0, total: 0 });
-  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; item: CoupleItem } | null>(null);
+  const [previewPhoto, setPreviewPhoto] = useState<{ url: string; item: CoupleItem; imageIndex: number } | null>(null);
   const [selfRole, setSelfRole] = useState(S.husband);
   const [peerRole, setPeerRole] = useState(S.wife);
   const [gender, setGender] = useState('');
@@ -258,7 +261,7 @@ export default function RelationshipSpaceContent() {
   const peerName = useMemo(() => nameOf(summary.peer), [summary.peer]);
   const selectedFriend = friends.find(friend => friend.peer.id === selectedPeerId);
   const visibleItems = items.filter(item => item.type === memoryTab);
-  const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map(url => ({ url, item })));
+  const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
 
   const uploadOnePhoto = async (file: File) => {
     const data = new FormData();
@@ -316,6 +319,17 @@ export default function RelationshipSpaceContent() {
     await api('DELETE', `/api/couples/items/${id}`);
     await loadItems();
   }, S.archived);
+  const movePhoto = async (item: CoupleItem, imageIndex: number, direction: -1 | 1) => {
+    const images = imagesOf(item);
+    const nextIndex = imageIndex + direction;
+    if (nextIndex < 0 || nextIndex >= images.length) return;
+    [images[imageIndex], images[nextIndex]] = [images[nextIndex], images[imageIndex]];
+    await act(async () => {
+      const updated = await api<CoupleItem>('PATCH', `/api/couples/items/${item.id}`, { images });
+      await loadItems();
+      setPreviewPhoto({ url: images[nextIndex], item: updated, imageIndex: nextIndex });
+    }, S.orderSaved);
+  };
 
   if (summary.status === 'none') {
     return (
@@ -394,13 +408,13 @@ export default function RelationshipSpaceContent() {
             </div>
             <div className="relative mt-5 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-col items-center">
-                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{user?.avatar ? <img src={assetUrl(user.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{(user?.nickname || user?.username || '\u6211')[0]}</div>}</div>
+                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{user?.avatar ? <CachedImage src={assetUrl(user.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{(user?.nickname || user?.username || '\u6211')[0]}</div>}</div>
                 <p className="mt-2 max-w-full truncate text-sm font-bold">{user?.nickname || user?.username || '\u6211'}</p>
                 <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{selfRole}</span>
               </div>
               <div className="flex shrink-0 flex-col items-center"><div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-3xl text-rose-500 shadow-xl shadow-rose-500/20">{H}</div><p className="mt-2 text-[11px] text-white/75">{S.sweet}</p></div>
               <div className="flex min-w-0 flex-1 flex-col items-center">
-                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{summary.peer?.avatar ? <img src={assetUrl(summary.peer.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{peerName[0]}</div>}</div>
+                <div className="h-20 w-20 overflow-hidden rounded-[28px] border-4 border-white/70 bg-white/25 shadow-xl">{summary.peer?.avatar ? <CachedImage src={assetUrl(summary.peer.avatar)} className="h-full w-full object-cover" alt="" /> : <div className="flex h-full w-full items-center justify-center text-2xl font-black">{peerName[0]}</div>}</div>
                 <p className="mt-2 max-w-full truncate text-sm font-bold">{peerName}</p>
                 <span className="mt-1 rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold">{peerRole}</span>
               </div>
@@ -437,7 +451,29 @@ export default function RelationshipSpaceContent() {
             {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{memoryTab === 'photo' ? S.batchAdd : S.addPhoto}<input type="file" accept="image/*" multiple={memoryTab === 'photo'} className="hidden" onChange={e => { if (!e.target.files) return; memoryTab === 'photo' ? uploadAlbumFiles(e.target.files) : e.target.files[0] && uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
             {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
             <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{(memoryTab === 'photo' || memoryTab === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
-            <div className="mt-4 space-y-2">{visibleItems.map(item => <div key={item.id} className="rounded-2xl bg-gray-50 p-3 dark:bg-gray-800/70">{imagesOf(item).length > 0 && <div className="mb-2 flex gap-2 overflow-x-auto">{imagesOf(item).map(url => <img key={url} src={assetUrl(url)} alt="" className="h-20 w-20 rounded-xl object-cover" />)}</div>}<div className="flex items-start justify-between gap-2"><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{item.title || item.cityName || '\u672a\u547d\u540d\u8bb0\u5f55'}</p><p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>{memoryTab === 'song' && songUrl(item) && <audio className="mt-2 h-9 w-full" controls preload="none" src={songUrl(item)} />}{item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}</div><button onClick={() => archiveItem(item.id)} className="shrink-0 text-gray-300 hover:text-red-400"><Trash2 size={15} /></button></div></div>)}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>
+            <div className="mt-4 space-y-3">{visibleItems.map(item => {
+              const photos = imagesOf(item);
+              const first = photos[0];
+              return (
+                <div key={item.id} className="overflow-hidden rounded-[26px] bg-white shadow-sm ring-1 ring-black/5 dark:bg-gray-800/70">
+                  {photos.length > 0 && (
+                    <button onClick={() => setAlbumOpen(true)} className="block w-full text-left">
+                      {first && <CachedImage src={assetUrl(first)} alt="" className="h-56 w-full object-cover" />}
+                      {photos.length > 1 && <div className="grid grid-cols-4 gap-1 p-2">{photos.slice(1, 5).map(url => <CachedImage key={url} src={assetUrl(url)} alt="" className="h-20 w-full rounded-xl object-cover" />)}</div>}
+                    </button>
+                  )}
+                  <div className="flex items-start justify-between gap-2 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-black text-gray-800 dark:text-gray-100">{item.title || item.cityName || '\u672a\u547d\u540d\u8bb0\u5f55'}</p>
+                      <p className="mt-1 whitespace-pre-wrap text-xs text-gray-500">{item.content}</p>
+                      {memoryTab === 'song' && songUrl(item) && <audio className="mt-2 h-9 w-full" controls preload="none" src={songUrl(item)} />}
+                      {item.happenedAt && <p className="mt-1 text-[11px] text-gray-400">{new Date(item.happenedAt).toLocaleDateString()}</p>}
+                    </div>
+                    <button onClick={() => archiveItem(item.id)} className="shrink-0 rounded-full p-2 text-gray-300 hover:bg-red-50 hover:text-red-400"><Trash2 size={16} /></button>
+                  </div>
+                </div>
+              );
+            })}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>
           </section>
         )}
 
@@ -514,8 +550,8 @@ export default function RelationshipSpaceContent() {
                 </label>
               ) : (
                 <div className="columns-2 gap-3 [column-fill:_balance]">
-                  {albumPhotos.map(({ url, item }, index) => (
-                    <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
+                  {albumPhotos.map(({ url, item, imageIndex }, index) => (
+                    <button key={`${item.id}-${url}-${index}`} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="group mb-3 block w-full break-inside-avoid overflow-hidden rounded-[26px] bg-white text-left shadow-sm shadow-rose-100/60 ring-1 ring-black/5 transition-transform active:scale-[0.98] dark:bg-gray-900">
                       <CachedImage src={assetUrl(url)} alt={item.title || S.albumPage} className={`${masonryTone(index)} w-full object-cover transition-transform duration-300 group-active:scale-95`} />
                       {(item.title || item.happenedAt) && <div className="p-2.5 text-xs text-gray-500"><p className="truncate font-semibold text-gray-700 dark:text-gray-200">{item.title || S.albumPage}</p>{item.happenedAt && <p>{new Date(item.happenedAt).toLocaleDateString()}</p>}</div>}
                     </button>
@@ -527,7 +563,13 @@ export default function RelationshipSpaceContent() {
               <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4" onClick={() => setPreviewPhoto(null)}>
                 <button className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"><X size={22} /></button>
                 <CachedImage src={assetUrl(previewPhoto.url)} alt={previewPhoto.item.title || S.albumPage} className="max-h-[82dvh] max-w-full rounded-2xl object-contain shadow-2xl" />
-                {(previewPhoto.item.title || previewPhoto.item.happenedAt) && <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-3 text-center text-sm text-white backdrop-blur"><p className="font-bold">{previewPhoto.item.title || S.albumPage}</p>{previewPhoto.item.happenedAt && <p className="mt-1 text-xs text-white/70">{new Date(previewPhoto.item.happenedAt).toLocaleDateString()}</p>}</div>}
+                <div className="absolute bottom-6 left-4 right-4 rounded-3xl bg-white/10 p-3 text-center text-sm text-white backdrop-blur" onClick={event => event.stopPropagation()}>
+                  {(previewPhoto.item.title || previewPhoto.item.happenedAt) && <><p className="font-bold">{previewPhoto.item.title || S.albumPage}</p>{previewPhoto.item.happenedAt && <p className="mt-1 text-xs text-white/70">{new Date(previewPhoto.item.happenedAt).toLocaleDateString()}</p>}</>}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button disabled={previewPhoto.imageIndex <= 0 || busy} onClick={() => movePhoto(previewPhoto.item, previewPhoto.imageIndex, -1)} className="rounded-2xl bg-white/15 py-2 text-xs font-bold text-white disabled:opacity-35">{S.movePrev}</button>
+                    <button disabled={previewPhoto.imageIndex >= imagesOf(previewPhoto.item).length - 1 || busy} onClick={() => movePhoto(previewPhoto.item, previewPhoto.imageIndex, 1)} className="rounded-2xl bg-white/15 py-2 text-xs font-bold text-white disabled:opacity-35">{S.moveNext}</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

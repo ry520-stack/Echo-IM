@@ -13,6 +13,7 @@ router.post('/unbind', controller.unbind);
 router.post('/force-unbind', controller.forceUnbind);
 router.get('/items', controller.getItems);
 router.post('/items', controller.createItem);
+router.patch('/items/:id', controller.updateItem);
 router.delete('/items/:id', controller.archiveItem);
 router.patch('/cycle', controller.updateCycle);
 router.get('/contracts', controller.getContracts);

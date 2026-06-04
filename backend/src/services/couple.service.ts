@@ -304,6 +304,21 @@ export async function createItem(userId: string, data: any) {
   return item;
 }
 
+export async function updateItem(userId: string, itemId: string, data: any) {
+  const bond = await requireActive(userId);
+  const item = await prisma.coupleItem.findFirst({ where: { id: itemId, coupleId: bond.id, archived: false } });
+  if (!item) throw new Error('\u5185\u5bb9\u4e0d\u5b58\u5728');
+  const update: any = {};
+  if ('title' in data) update.title = String(data.title || '').slice(0, 80);
+  if ('content' in data) update.content = String(data.content || '').slice(0, 1000);
+  if ('cityName' in data) update.cityName = String(data.cityName || '').slice(0, 40);
+  if ('happenedAt' in data) update.happenedAt = data.happenedAt ? new Date(data.happenedAt) : null;
+  if (Array.isArray(data.images)) update.images = JSON.stringify(data.images.slice(0, 80));
+  const updated = await prisma.coupleItem.update({ where: { id: item.id }, data: update });
+  notify(bond);
+  return updated;
+}
+
 export async function archiveItem(userId: string, itemId: string) {
   const bond = await requireActive(userId);
   const item = await prisma.coupleItem.findFirst({ where: { id: itemId, coupleId: bond.id } });

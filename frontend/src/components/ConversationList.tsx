@@ -7,6 +7,7 @@ import { useNotification } from '../hooks/useNotification';
 import { useBackground } from '../hooks/useBackground';
 import { assetUrl } from '../utils/assetUrl';
 import { messagePreview } from '../utils/messagePreview';
+import CachedImage from './CachedImage';
 
 interface Peer {
   id: string; username: string; nickname: string; avatar: string;
@@ -358,7 +359,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                     >
                       <div className="relative shrink-0">
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-lg font-bold text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
-                          {conv.peer.avatar ? <img src={assetUrl(conv.peer.avatar)} alt="" className="h-full w-full rounded-xl object-cover" /> : getDisplayName(conv.peer)[0]?.toUpperCase() || '?'}
+                          {conv.peer.avatar ? <CachedImage src={assetUrl(conv.peer.avatar)} alt="" className="h-full w-full rounded-xl object-cover" /> : getDisplayName(conv.peer)[0]?.toUpperCase() || '?'}
                         </div>
                         {isOnline && <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-green-500 dark:border-gray-900 animate-pulse ring-2 ring-green-500/30" />}
                       </div>

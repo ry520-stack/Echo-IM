@@ -14,6 +14,7 @@ export function unbind(req: Request, res: Response) { handle(res, service.unbind
 export function forceUnbind(req: Request, res: Response) { handle(res, service.forceUnbind(req.userId)); }
 export function getItems(req: Request, res: Response) { handle(res, service.getItems(req.userId, String(req.query.type || ''))); }
 export function createItem(req: Request, res: Response) { handle(res, service.createItem(req.userId, req.body || {})); }
+export function updateItem(req: Request, res: Response) { handle(res, service.updateItem(req.userId, req.params.id, req.body || {})); }
 export function archiveItem(req: Request, res: Response) { handle(res, service.archiveItem(req.userId, req.params.id)); }
 export function updateCycle(req: Request, res: Response) { handle(res, service.updateCycle(req.userId, req.body || {})); }
 export function getContracts(req: Request, res: Response) { handle(res, service.getContracts(req.userId)); }
