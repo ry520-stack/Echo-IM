@@ -36,6 +36,7 @@ export default function ChatPage() {
   const [showChatMobile, setShowChatMobile] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchTab, setSearchTab] = useState<'contacts' | 'messages'>('contacts');
+  const [relationshipGestureLocked, setRelationshipGestureLocked] = useState(false);
 
   // 鈹€鈹€鈹€ Refs 鈹€鈹€鈹€
   const pagerRef = useRef<HTMLDivElement>(null);
@@ -53,6 +54,11 @@ export default function ChatPage() {
   // 鈹€鈹€鈹€ 婊氬姩椹卞姩鍔ㄧ敾锛堢函 DOM锛屼笉瑙﹀彂 React 娓叉煋锛夆攢鈹€鈹€
   const animFrameRef = useRef(0);
   useEffect(() => { return () => { cancelAnimationFrame(animFrameRef.current); }; }, []);
+  useEffect(() => {
+    const onLock = (event: Event) => setRelationshipGestureLocked(Boolean((event as CustomEvent<boolean>).detail));
+    window.addEventListener('relationship-space-gesture-lock', onLock as EventListener);
+    return () => window.removeEventListener('relationship-space-gesture-lock', onLock as EventListener);
+  }, []);
   const handleScroll = useCallback(() => {
     cancelAnimationFrame(animFrameRef.current);
     animFrameRef.current = requestAnimationFrame(() => {
@@ -228,7 +234,7 @@ export default function ChatPage() {
       <div
         ref={pagerRef}
         className="pager-snap flex-1 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory"
-        style={{ scrollBehavior: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        style={{ scrollBehavior: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none', overflowX: relationshipGestureLocked ? 'hidden' : 'auto' }}
         onScroll={handleScroll}
       >
         {/* 椤甸潰 0锛氫細璇濆垪琛?*/}

@@ -230,6 +230,14 @@ export default function RelationshipSpaceContent() {
   const [peerRole, setPeerRole] = useState(S.wife);
   const [gender, setGender] = useState('');
 
+  useEffect(() => {
+    const locked = albumOpen || pendingAlbumFiles.length > 0 || !!previewPhoto;
+    window.dispatchEvent(new CustomEvent('relationship-space-gesture-lock', { detail: locked }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('relationship-space-gesture-lock', { detail: false }));
+    };
+  }, [albumOpen, pendingAlbumFiles.length, previewPhoto]);
+
   const load = useCallback(async () => setSummary(await api<Summary>('GET', '/api/couples')), []);
   const loadItems = useCallback(async () => setItems(await api<CoupleItem[]>('GET', '/api/couples/items')), []);
   useEffect(() => { load().catch(() => setSummary({ status: 'none' })); }, [load]);
@@ -266,6 +274,7 @@ export default function RelationshipSpaceContent() {
   const visibleItems = items.filter(item => item.type === memoryTab);
   const photoItems = items.filter(item => item.type === 'photo');
   const albumPhotos = items.filter(item => item.type === 'photo').flatMap(item => imagesOf(item).map((url, imageIndex) => ({ url, item, imageIndex })));
+  const recentAlbumPhotos = albumPhotos.slice(0, 8);
 
   const uploadOnePhoto = async (file: File) => {
     const data = new FormData();
@@ -467,12 +476,38 @@ export default function RelationshipSpaceContent() {
         {section === 'memory' && (
           <section className="rounded-[28px] border border-white/80 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-white/10 dark:bg-gray-900/80">
             <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{MEMORY_TABS.map(({ key, label, Icon }) => <button key={key} onClick={() => setMemoryTab(key)} className={`flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs ${memoryTab === key ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}><Icon size={13} />{label}</button>)}</div>
-            {memoryTab === 'photo' && <button onClick={() => setAlbumOpen(true)} className="mb-3 flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-4 py-3 text-left text-sm font-bold text-white shadow-lg shadow-rose-200/60"><span>{S.openAlbum}</span><span className="text-xs font-medium text-white/75">{albumPhotos.length} photos</span></button>}
-            {memoryTab === 'photo' && <p className="mb-2 text-xs text-gray-400">{S.originalUpload}</p>}
-            {(memoryTab === 'photo' || memoryTab === 'footprint') && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{memoryTab === 'photo' ? S.batchAdd : S.addPhoto}<input type="file" accept="image/*" multiple={memoryTab === 'photo'} className="hidden" onChange={e => { if (!e.target.files) return; memoryTab === 'photo' ? queueAlbumFiles(e.target.files) : e.target.files[0] && uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
-            {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
-            <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{(memoryTab === 'photo' || memoryTab === 'footprint') && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
-            <div className="mt-4 space-y-3">{visibleItems.map(item => {
+            {memoryTab === 'photo' ? (
+              <div className="space-y-3">
+                <button onClick={() => setAlbumOpen(true)} className="flex w-full items-center justify-between rounded-[26px] bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 px-5 py-4 text-left text-white shadow-lg shadow-rose-200/60">
+                  <span>
+                    <span className="block text-lg font-black">{S.openAlbum}</span>
+                    <span className="mt-1 block text-xs text-white/75">照片墙、标签、批量添加都在这里</span>
+                  </span>
+                  <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold">{albumPhotos.length} 张</span>
+                </button>
+                {recentAlbumPhotos.length > 0 ? (
+                  <div data-relationship-gesture-lock className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [touch-action:pan-x]">
+                    {recentAlbumPhotos.map(({ url, item, imageIndex }, index) => (
+                      <button key={`${item.id}-${url}-${index}`} onClick={() => { setAlbumOpen(true); setPreviewPhoto({ url, item, imageIndex }); }} className="shrink-0 overflow-hidden rounded-[22px] bg-rose-50 shadow-sm ring-1 ring-black/5">
+                        <CachedImage src={assetUrl(url)} alt="" className="h-36 w-28 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <button onClick={() => setAlbumOpen(true)} className="flex h-36 w-full flex-col items-center justify-center rounded-[26px] border border-dashed border-rose-200 bg-rose-50/70 text-rose-400">
+                    <ImagePlus size={28} />
+                    <span className="mt-2 text-sm font-bold">去相册添加第一张照片</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {memoryTab === 'footprint' && <label className="mb-3 flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-rose-50 py-3 text-sm font-semibold text-rose-500 dark:bg-rose-950/30"><ImagePlus size={16} />{S.addPhoto}<input type="file" accept="image/*" className="hidden" onChange={e => { if (!e.target.files?.[0]) return; uploadPhoto(e.target.files[0]); e.currentTarget.value = ''; }} /></label>}
+                {itemForm.images.length > 0 && <div className="mb-3 flex gap-2 overflow-x-auto">{itemForm.images.map(url => <img key={url} src={assetUrl(url)} alt="" className="h-16 w-16 rounded-xl object-cover" />)}</div>}
+                <div className="space-y-2"><input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder={memoryTab === 'song' ? `${S.song}${S.title}` : S.title} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input value={itemForm.cityName} onChange={e => setItemForm({ ...itemForm, cityName: e.target.value })} placeholder={S.city} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<textarea value={itemForm.content} onChange={e => setItemForm({ ...itemForm, content: e.target.value })} placeholder={S.note} className="min-h-20 w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />{memoryTab === 'footprint' && <input type="date" value={itemForm.happenedAt} onChange={e => setItemForm({ ...itemForm, happenedAt: e.target.value })} className="w-full rounded-2xl bg-gray-100 px-3 py-2.5 text-sm outline-none dark:bg-gray-800 dark:text-gray-200" />}<button disabled={busy || (!itemForm.title && !itemForm.content && itemForm.images.length === 0)} onClick={createItem} className="w-full rounded-2xl bg-rose-500 py-3 text-sm font-bold text-white disabled:opacity-40">{S.save}</button></div>
+              </>
+            )}
+            {memoryTab !== 'photo' && <div className="mt-4 space-y-3">{visibleItems.map(item => {
               const photos = imagesOf(item);
               return (
                 <div key={item.id} className="overflow-hidden rounded-[26px] bg-white shadow-sm ring-1 ring-black/5 dark:bg-gray-800/70">
@@ -496,7 +531,7 @@ export default function RelationshipSpaceContent() {
                   </div>
                 </div>
               );
-            })}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>
+            })}{visibleItems.length === 0 && <p className="py-4 text-center text-xs text-gray-400">{S.noRecord}</p>}</div>}
           </section>
         )}
 
@@ -536,7 +571,7 @@ export default function RelationshipSpaceContent() {
           </section>
         )}
         {albumOpen && (
-          <div className="fixed inset-0 z-[90] overflow-y-auto bg-[radial-gradient(circle_at_top,#ffe0ec_0,#fff8fb_42%,#ffffff_75%)] dark:bg-gray-950">
+          <div data-relationship-gesture-lock className="fixed inset-0 z-[90] overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_top,#ffe0ec_0,#fff8fb_42%,#ffffff_75%)] dark:bg-gray-950">
             <div className="sticky top-0 z-10 border-b border-white/70 bg-white/80 px-4 py-3 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
               <div className="mx-auto flex max-w-lg items-center justify-between">
                 <button onClick={() => setAlbumOpen(false)} className="flex items-center gap-1 rounded-full bg-white/70 px-3 py-2 text-sm font-semibold text-gray-500 shadow-sm"><X size={18} />{S.close}</button>
@@ -581,7 +616,7 @@ export default function RelationshipSpaceContent() {
                           </div>
                           <button onClick={() => archiveItem(item.id)} className="rounded-full p-2 text-gray-300 hover:bg-red-50 hover:text-red-400"><Trash2 size={16} /></button>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
+                        <div data-relationship-gesture-lock className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [touch-action:pan-x]">
                           {photos.map((url, imageIndex) => (
                             <button key={url} onClick={() => setPreviewPhoto({ url, item, imageIndex })} className="shrink-0 overflow-hidden rounded-2xl">
                               <CachedImage src={assetUrl(url)} alt="" className="h-44 w-32 object-cover" />
