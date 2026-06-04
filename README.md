@@ -1,69 +1,150 @@
 # Echo IM
 
-Echo IM 是一个面向移动端体验的云端即时通讯项目，包含私聊、群聊、朋友圈、语音消息、语音通话、表情包、背景自定义、会话搜索、聊天记录搜索、来电铃声和关系型互动能力。项目已部署到 ECS，并通过 HTTPS 域名 `echo-im.cloud` 对外访问。
+Echo IM 是一个面向移动端体验的实时通信与情侣空间项目。它不是单纯的聊天 Demo，而是围绕「聊天、关系、回忆、共同养成」做的一套完整应用：用户可以私聊、群聊、发动态、语音通话，也可以和绑定对象进入情侣空间，管理纪念日、天气关怀、共同相册、共同宠物和关系互动内容。
 
-## 功能特色
+项目已部署在阿里云 ECS，使用 Docker Compose 管理前端、后端和 PostgreSQL 服务，并通过 HTTPS/WSS 对外提供访问。
 
-- 账号体系：邮箱注册、登录、找回密码、Echo ID 搜索。
-- 私聊：文本、图片、语音、视频、撤回、删除、清空会话、已读回执、在线状态。
-- 群聊：创建群聊、拉人进群、群资料、成员管理、群内昵称和备注。
-- 会话列表：好友/会话搜索、聊天记录搜索、置顶、隐藏、未读数。
-- 语音能力：语音消息录制播放、WebRTC 语音通话、通话记录。
-- 铃声设置：自定义来电铃声，呼出时可选择听对方铃声或自己的铃声。
-- 表情包：上传、发送、批量管理、宫格排序、颜色高亮。
-- 朋友圈：文字图片动态、点赞、评论、可见范围、封面图、宫格排序。
-- 背景设置：会话列表、聊天界面、引力圈、好友专属聊天背景。
-- 个性化：暗黑模式、通知开关、高亮颜色（紫色、蓝色、黑色）。
-- Echo Pet：两人关系里的共同宠物，以第三个聊天成员的形式偶尔发言。
+## 项目亮点
 
-## 云端架构
+- 实时 IM：支持私聊、群聊、未读数、已读回执、在线状态、忙碌/离开/请勿打扰、消息搜索和定位跳转。
+- 音视频体验：支持语音消息、WebRTC 语音通话、来电/呼出铃声、通话状态同步。
+- 移动端交互：适配手机端会话列表、聊天窗口、表情面板、长按菜单、背景壁纸和手势滑动。
+- 情侣空间：支持情侣绑定、纪念日、相识/相恋时长、城市天气、距离计算、SOS 想你、共同相册、城市足迹、情歌库、夸夸卡、记仇本、决定机器、爱情契约和周报。
+- 共同宠物：通过聊天卡片发起共同领养，双方共享宠物数据，包含等级、亲密度、金币、上学、工作、商店、背包、皮肤和任务体系。
+- 隐私控制：朋友圈评论/点赞按好友关系可见，情侣信息不向非好友暴露，生理期等敏感信息默认仅本人可见。
+- 云端部署：基于 ECS + Docker Compose + Nginx + PostgreSQL 部署，支持 HTTPS、WebSocket、上传文件和线上持续迭代。
+- AI 协同开发：使用 AI 参与需求拆解、方案评审、代码审查、问题定位和回归清单整理，开发者负责产品判断、核心实现、联调验证和上线部署。
 
-生产环境使用 Docker Compose 部署：
+## 功能模块
 
-- `frontend`：React + Vite + Nginx，提供 Web/App 静态资源。
-- `backend`：Node.js + Express + Socket.IO，提供 API、实时消息和通话信令。
-- `db`：PostgreSQL 16，保存用户、好友、群聊、消息、动态等数据。
-- `nginx`：宿主机入口，负责 HTTPS、反向代理、WebSocket 转发和上传大小限制。
+### 账号与好友
 
-请求链路：
+- 邮箱注册、登录、验证码、找回密码
+- Echo ID 搜索用户
+- 好友申请、同意、拒绝、删除、拉黑
+- 好友备注、分组、聊天背景
+- 在线、离线、忙碌、离开、请勿打扰状态
 
-```text
-用户 / App
-  -> https://echo-im.cloud
-  -> 宿主机 Nginx
-  -> frontend:8080 / backend:9090
-  -> PostgreSQL + uploads volume
-```
+### 聊天系统
+
+- 文本、图片、语音、视频、表情包消息
+- 消息撤回、删除、清空会话
+- 已读/未读状态
+- 聊天记录搜索，点击结果跳转到对应消息
+- 回复引用、表情面板、长按菜单
+- 会话列表搜索、未读数、最近消息预览
+
+### 语音通话
+
+- Socket.IO 信令
+- WebRTC 点对点语音通话
+- 来电弹窗、拒绝、挂断、超时处理
+- 呼出方和接收方铃声策略
+- 自定义铃声上传
+
+### 朋友圈
+
+- 文字和图片动态
+- 点赞、评论、封面图
+- 好友可见、部分可见、不给谁看
+- 非好友不可见对方评论和互动信息
+- 图片排序和基础相册展示
+
+### 情侣空间
+
+- 情侣申请与确认
+- 一人只能绑定一位情侣
+- 绑定后支持 90 天锁定期规则
+- 相识时长、相恋时长、倒计时和纪念日
+- 双方城市天气和异常天气提醒
+- 城市级地理信息和距离计算
+- SOS 想你按钮，带限频机制
+- 共同相册、城市足迹、情歌库、夸夸卡、记仇本、决定机器
+- 爱情契约、生理期关怀、每周报告
+- 情侣称呼支持同步配置
+
+### 共同宠物
+
+- 聊天内系统卡片发起共同领养
+- 对方同意后生成共享宠物
+- 双方立即看到同一只宠物
+- 等级、经验、亲密度、金币
+- 状态：清醒、睡觉、上学、工作、生病、沮丧、开心
+- 上学、工作带冷却和时长限制
+- 商店、背包、食物、玩具、药品、补签卡、限定皮肤
+- 聊天、图片、通话和连续互动驱动成长
 
 ## 技术栈
 
-前端：
+### 前端
 
-- React
-- TypeScript
-- Vite
+- React 19
+- TypeScript 5
+- Vite 8
 - Tailwind CSS
-- Framer Motion
+- React Router
 - Socket.IO Client
+- Framer Motion
 - lucide-react
 
-后端：
+### 后端
 
 - Node.js
 - Express
 - TypeScript
+- Socket.IO
 - Prisma
 - PostgreSQL
-- Socket.IO
-- Multer
 - JWT
+- Multer
+- Zod
+- Helmet / Rate Limit
 
-部署：
+### 部署
 
 - Alibaba Cloud ECS
 - Docker Compose
 - Nginx
-- HTTPS/WSS
+- PostgreSQL 16
+- HTTPS / WSS
+- Linux 运维与日志排查
+
+## 云端架构
+
+```text
+Mobile Web / App
+        |
+        | HTTPS / WSS
+        v
+Host Nginx
+        |
+        +--> frontend container: React static assets
+        |
+        +--> backend container: Express API + Socket.IO
+                    |
+                    +--> PostgreSQL
+                    |
+                    +--> uploads volume
+```
+
+生产环境通过 Docker Compose 编排：
+
+- `frontend`：构建 React 静态资源，并由 Nginx 容器提供访问。
+- `backend`：提供 REST API、Socket.IO 实时通信、通话信令和上传接口。
+- `db`：PostgreSQL 保存用户、好友、消息、动态、情侣空间和宠物数据。
+- `uploads`：保存头像、聊天图片、语音、视频、表情包、相册和背景图。
+
+## AI 协同方式
+
+这个项目使用 AI 作为工程协作工具，而不是简单替代开发：
+
+- 需求拆解：把「情侣空间」「共同宠物」「隐私规则」拆成可落地的前后端任务。
+- 方案评审：在数据库模型、接口边界、实时事件、移动端交互上做设计对比。
+- 代码辅助：辅助生成局部实现、迁移脚本、类型修复和重复逻辑整理。
+- 问题定位：根据截图、日志和构建错误快速定位前端样式、状态同步和数据库问题。
+- 回归验证：整理测试清单，覆盖登录、好友、聊天、已读、在线状态、情侣空间和宠物流程。
+
+最终的产品判断、代码取舍、线上联调、部署验证和数据处理由开发者完成。
 
 ## 本地开发
 
@@ -73,7 +154,6 @@ Echo IM 是一个面向移动端体验的云端即时通讯项目，包含私聊
 cd backend
 npm install
 npx prisma generate
-npx prisma db push
 npm run dev
 ```
 
@@ -85,28 +165,41 @@ npm install
 npm run dev
 ```
 
-生产构建：
+生产部署：
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## 上传与媒体
+## 环境变量
 
-项目支持头像、聊天图片、语音、视频、表情包、朋友圈图片、背景图和来电铃声上传。当前文件保存在服务器 volume，后续适合迁移到对象存储，并接入 CDN。
+后端常用环境变量：
 
-铃声上传支持 `mp3/m4a/aac/wav`，应用层限制为 80MB，Nginx 入口需要配置 `client_max_body_size`。
-
-## 文档
-
-- [云端架构实践](docs/juejin-01-echo-cloud-architecture.md)
-- [实时通信与 WebRTC](docs/juejin-02-echo-realtime-and-webrtc.md)
-- [云端产品化与存储演进](docs/juejin-03-echo-cloud-storage-and-product.md)
-
-## GitHub
-
-当前仓库：
-
-```text
-https://github.com/ry520-stack/-Echo-IM
+```env
+DATABASE_URL=postgresql://user:password@db:5432/echo_db
+JWT_SECRET=your-secret
+FRONTEND_URL=https://your-domain.com
+AMAP_WEB_SERVICE_KEY=your-amap-key
+OFFLINE_PUSH_ENABLED=false
 ```
+
+## 项目经验价值
+
+这个项目覆盖了从产品设计到云端上线的完整链路：
+
+- 前端页面和移动端交互实现
+- 后端 API 与实时通信
+- 数据库建模和隐私权限控制
+- 文件上传与媒体处理
+- Docker 化部署和服务器运维
+- 线上问题排查、数据清理和持续迭代
+- AI 辅助下的高频产品开发协作
+
+## 后续计划
+
+- 将上传文件迁移到对象存储并接入 CDN
+- 对聊天和动态图片做更细的原图/缩略图策略
+- 优化前端代码分包，降低首屏资源体积
+- 增加更系统的自动化测试
+- 完善情侣空间活动配置和宠物限定皮肤体系
+
