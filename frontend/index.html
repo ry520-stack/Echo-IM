@@ -24,8 +24,17 @@
   <body class="overflow-x-hidden">
     <div id="root">
       <div class="app-boot-fallback">
-        <div class="app-boot-logo">Echo</div>
-        <div class="app-boot-text">正在进入 Echo...</div>
+        <div class="app-boot-card">
+          <div class="app-boot-logo">E</div>
+          <div class="app-boot-title">Echo</div>
+          <div class="app-boot-subtitle">新一代轻量级即时通讯空间</div>
+          <div class="app-boot-status">
+            <div class="app-boot-text">正在连接 Echo 服务...</div>
+            <div class="app-boot-progress"></div>
+            <div class="app-boot-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+        <div class="app-boot-footer">Echo IM · Real-time Communication Platform</div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
@@ -33,7 +42,7 @@
       window.addEventListener('error', function () {
         var root = document.getElementById('root');
         if (!root || root.dataset.ready === '1') return;
-        root.innerHTML = '<div class="app-boot-fallback"><div class="app-boot-logo">Echo</div><div class="app-boot-text">加载失败，请刷新或用系统浏览器打开</div><button class="app-boot-button" onclick="location.reload()">重新加载</button></div>';
+        root.innerHTML = '<div class="app-boot-fallback"><div class="app-boot-card"><div class="app-boot-logo">E</div><div class="app-boot-title">Echo</div><div class="app-boot-subtitle">新一代轻量级即时通讯空间</div><div class="app-boot-status"><div class="app-boot-text">Echo 服务连接失败</div><button class="app-boot-button" style="margin-top:14px;height:48px;width:100%;" onclick="location.reload()">重试</button></div></div><div class="app-boot-footer">Echo IM · Real-time Communication Platform</div></div>';
       });
       if ('serviceWorker' in navigator && location.protocol === 'https:') {
         window.addEventListener('load', () => {

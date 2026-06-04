@@ -510,6 +510,46 @@ export default function RelationshipSpaceContent() {
         )}
 
         {section === 'memory' && (
+          <section className="space-y-4">
+            <div>
+              <p className="text-lg font-black text-gray-950 dark:text-white">回忆中心</p>
+              <p className="mt-1 text-xs text-gray-400">照片、足迹、情歌和夸夸，都收在这里。</p>
+            </div>
+            <button onClick={() => { setMemoryTab('photo'); setAlbumOpen(true); }} className="w-full overflow-hidden rounded-[20px] bg-white p-4 text-left shadow-sm ring-1 ring-rose-100/70">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm font-black text-gray-950"><Camera size={17} className="text-[#FF4F8B]" />关系相册</span>
+                <span className="text-xs font-bold text-gray-400">{totalAlbumPhotos} 张照片</span>
+              </div>
+              {recentAlbumPhotos.length > 0 ? (
+                <div data-relationship-gesture-lock className="mt-3 flex gap-3 overflow-x-auto overscroll-x-contain pb-1 [touch-action:pan-x]">
+                  {recentAlbumPhotos.map(({ url, item, imageIndex }, index) => (
+                    <span key={`${item.id}-${url}-${index}-${imageIndex}`} className="block h-36 w-28 shrink-0 overflow-hidden rounded-2xl bg-rose-50 shadow-sm">
+                      <CachedImage src={assetUrl(url)} alt="" className="h-full w-full object-cover" />
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3 flex h-28 items-center justify-center rounded-2xl bg-[#FFF7FA] text-xs font-bold text-[#FF4F8B]">去添加第一张照片</div>
+              )}
+            </button>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['footprint', '足迹地图', MapPin, '一起去过的地方'],
+                ['song', '情歌', Music, '属于你们的歌'],
+                ['praise', '夸夸墙', Sparkles, '把喜欢说出来'],
+                ['grudge', '小账本', Trash2, '轻轻记一笔'],
+              ].map(([key, title, Icon, desc]: any) => (
+                <button key={key} onClick={() => setMemoryTab(key)} className={`rounded-[20px] bg-white p-4 text-left shadow-sm ring-1 ring-rose-100/70 ${memoryTab === key ? 'ring-[#FF4F8B]/40' : ''}`}>
+                  <Icon size={18} className="text-[#FF4F8B]" />
+                  <p className="mt-2 text-sm font-black text-gray-950">{title}</p>
+                  <p className="mt-1 text-xs text-gray-400">{desc}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {false && section === 'memory' && (
           <>
           <section className="space-y-4">
             <div>
