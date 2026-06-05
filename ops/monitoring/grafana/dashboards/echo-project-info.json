@@ -1,0 +1,78 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "📡 Echo IM 项目概览",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "title": "",
+      "type": "text",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 🌌 Echo IM — 星际与共鸣\n\n**Echo** 是一款极简、沉浸、反臃肿的私人社交宇宙即时通讯应用。\n\n### 设计语言\n- 🎨 **深空背景**：OLED black `#05050A`，品牌蓝紫色 `#6366f1`\n- 💎 **Glassmorphism**：毛玻璃 `backdrop-blur-xl`\n- 🎬 **Framer Motion**：弹簧物理动画 `spring stiffness:150-300 damping:20-25`\n- 🌌 **命名体系**：引力圈(Gravity Zone)、星轨(Orbit)、回声胶囊(Time Capsule)\n\n### 核心功能\n| 功能 | 说明 |\n|------|------|\n| 引力圈(Gravity Zone) | 首页左滑进入，深空 OLED 黑，捕获重要联系人 |\n| 对称隐私 | 任一方关闭已读 → 双方全部隐藏 |\n| 消息本地销毁 | 120秒时空撤回 |\n| 流体滑动语音 | SVG 流体滤镜 + 物理拖拽 |\n| 会呼吸的输入栏 | 5秒无操作阻尼折叠 |\n| 星轨(Orbit) | 悬浮循环堆叠、10秒倒放、宫格横滑分页 |"
+      }
+    },
+    {
+      "title": "🛠️ 技术栈",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 11 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 技术栈\n\n### 前端\n- React 19 + TypeScript\n- Tailwind CSS 3\n- Vite 8\n- Framer Motion 12\n\n### 后端\n- Node.js + Express\n- Prisma ORM\n- PostgreSQL 16\n- Socket.IO (WebSocket + polling)\n\n### 部署\n- Docker Compose 三容器架构\n- Nginx 反向代理\n- 阿里云 ECS\n- Let's Encrypt HTTPS"
+      }
+    },
+    {
+      "title": "🏗️ 系统架构",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 11 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 系统架构\n\n```\n┌─────────────────────────────────────┐\n│           Nginx (80/443)            │\n│         反向代理 + HTTPS             │\n└──────────┬──────────┬───────────────┘\n           │          │\n     ┌─────▼──┐  ┌────▼─────┐\n     │Frontend│  │ Backend  │\n     │ :8080  │  │  :9090   │\n     │ React  │  │ Express  │\n     └────────┘  └────┬─────┘\n                      │\n               ┌──────▼──────┐\n               │ PostgreSQL  │\n               │   :5433     │\n               │  16-alpine  │\n               └─────────────┘\n```\n\n### 网络拓扑\n- echo_default: 业务容器网络\n- monitoring_net: 监控容器网络\n- 两个网络互通，实现服务发现"
+      }
+    },
+    {
+      "title": "📊 监控平台",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 监控平台组件\n\n| 组件 | 端口 | 作用 |\n|------|------|------|\n| Prometheus | 9091 | 指标采集存储 |\n| Grafana | 3000 | 可视化仪表盘 |\n| Alertmanager | 9093 | 告警路由通知 |\n| Node Exporter | 9100 | 主机指标采集 |\n| PostgreSQL Exporter | 9187 | 数据库指标 |\n| Loki | 3100 | 日志聚合存储 |\n| Promtail | 9080 | 日志采集代理 |\n\n### 监控指标\n- 15+ 主机/容器/数据库指标\n- 10+ 告警规则\n- 全量容器日志采集"
+      }
+    },
+    {
+      "title": "🔗 项目链接",
+      "type": "text",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 项目链接\n\n### 访问地址\n- 🌐 **应用**: https://echo-im.cloud\n- 📊 **监控**: http://8.140.194.214:3000\n- 📈 **Prometheus**: http://8.140.194.214:9091\n\n### 代码仓库\n- 📦 **GitHub**: https://github.com/ry520-stack/Echo-IM\n\n### 技术文章\n- 掘金专栏 7 篇\n- 开发者手记 7 篇\n- 三体协作模式 1 篇\n\n### 服务器信息\n- **ECS**: 阿里云 2核 1.8GB\n- **系统**: Linux 5.10 (Alibaba Cloud)\n- **Docker**: 26.1.3 + Compose v2.27.0"
+      }
+    },
+    {
+      "title": "🚨 告警规则总览",
+      "type": "text",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 27 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 告警规则总览\n\n| 告警名称 | 条件 | 等级 | 说明 |\n|---------|------|------|------|\n| HighCpuUsage | CPU > 85% 持续 5m | ⚠️ warning | CPU 过载 |\n| HighMemoryUsage | 内存 > 90% 持续 5m | ⚠️ warning | 内存紧张 |\n| DiskSpaceLow | 根分区 < 20% | ⚠️ warning | 磁盘预警 |\n| DiskSpaceCritical | 根分区 < 10% | 🔴 critical | 磁盘危险 |\n| HostDown | Node Exporter 无响应 1m | 🔴 critical | 主机宕机 |\n| EchoContainerDown | Echo 容器停止 1m | 🔴 critical | 业务中断 |\n| ContainerHighCpu | 容器 CPU > 80% | ⚠️ warning | 容器过载 |\n| ContainerRestartLoop | 5m 内重启 > 2 次 | ⚠️ warning | 容器异常 |\n| PostgresqlHighConnections | 连接数 > 80 | ⚠️ warning | 连接池紧张 |\n| PostgresqlExporterDown | Exporter 无响应 2m | 🔴 critical | 监控中断 |"
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["echo", "project", "info"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "Echo IM 项目介绍",
+  "uid": "echo-project-info",
+  "version": 1
+}
