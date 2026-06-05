@@ -1,0 +1,93 @@
+# ============================================================
+# Promtail 配置文件
+#
+# Promtail 是 Loki 的日志采集代理
+# 类似 Filebeat 但与 Loki 深度集成
+#
+# 采集目标：
+#   1. Docker 容器日志（所有容器）
+#   2. Nginx 访问日志（如果有挂载）
+#   3. 系统日志（/var/log/syslog 等）
+# ============================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# 位置文件：记录日志读取位置，避免重启后重复采集
+positions:
+  filename: /run/promtail/positions.yaml
+
+# 输出到 Loki
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+# 日志采集配置
+scrape_configs:
+  # ── Docker 容器日志 ──
+  # 自动发现所有 Docker 容器，采集 stdout/stderr
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          # 排除监控组件自身的日志（避免循环）
+          - name: label
+            values: ["com.docker.compose.project!=monitoring"]
+    relabel_configs:
+      # 用容器名作为标签
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # 用 compose 服务名作为标签
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'compose_service'
+      # 用容器 ID 作为标签
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+    pipeline_stages:
+      # Docker 日志格式解析
+      - docker: {}
+      # 提取日志级别（如果有的话）
+      - regex:
+          expression: '(?i)(?P<level>error|warn|info|debug|fatal|panic)'
+      - labels:
+          level:
+
+  # ── Nginx 访问日志 ──
+  # 采集宿主机 Nginx 日志
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          host: echo-ecs
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      # Nginx 日志格式解析
+      - regex:
+          expression: '^(?P<remote_addr>[\d\.]+) - .* "(?P<method>\w+) (?P<path>[^\s]*) HTTP/[\d\.]+" (?P<status>\d+) (?P<bytes>\d+)'
+      - labels:
+          method:
+          status:
+
+  # ── Nginx 错误日志 ──
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          host: echo-ecs
+          __path__: /var/log/nginx/error.log
+
+  # ── 系统日志 ──
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: echo-ecs
+          __path__: /var/log/syslog

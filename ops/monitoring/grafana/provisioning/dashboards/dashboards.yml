@@ -1,0 +1,20 @@
+# ============================================================
+# Grafana Dashboard 自动导入配置
+#
+# 为什么用 provisioning：Dashboard JSON 文件放在指定目录
+# Grafana 启动时自动导入，无需手动上传
+# ============================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Echo IM Monitoring'
+    orgId: 1
+    folder: 'Echo IM'                          # Grafana 中的文件夹名
+    type: file
+    disableDeletion: false                     # 允许删除
+    editable: true                             # 允许在 UI 中编辑
+    updateIntervalSeconds: 30                  # 每 30 秒检查文件变化
+    options:
+      path: /var/lib/grafana/dashboards        # Dashboard JSON 文件目录
+      foldersFromFilesStructure: false

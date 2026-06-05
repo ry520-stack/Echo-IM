@@ -1,0 +1,179 @@
+# ============================================================
+# Prometheus 告警规则
+#
+# 告警等级：
+#   critical - 服务宕机、数据丢失风险，需立即处理
+#   warning  - 资源紧张、性能下降，需尽快处理
+#   info     - 信息性告警，用于趋势监控
+#
+# 告警流程：
+#   Prometheus 评估规则 → 触发告警 → 发送到 Alertmanager
+#   → Alertmanager 去重/分组 → 发送通知（邮件/钉钉/企微）
+# ============================================================
+
+groups:
+  # ──────────────────────────────────────────────
+  # 主机资源告警
+  # ──────────────────────────────────────────────
+  - name: host_alerts
+    rules:
+      # CPU 使用率超过 85% 持续 5 分钟
+      # 为什么 85%：留 15% 缓冲，避免短暂峰值误报
+      - alert: HighCpuUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'CPU 使用率过高'
+          description: '实例 {{ $labels.instance }} CPU 使用率 {{ $value | printf "%.1f" }}%，持续超过 5 分钟'
+
+      # 内存使用率超过 90%
+      # 为什么 90%：Linux 会用空闲内存做缓存，实际可用比显示的少
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '内存使用率过高'
+          description: '实例 {{ $labels.instance }} 内存使用率 {{ $value | printf "%.1f" }}%'
+
+      # 磁盘空间不足 20%
+      # 为什么 20%：Docker 镜像和日志增长快，提前预警
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '磁盘空间不足'
+          description: '实例 {{ $labels.instance }} 根分区剩余 {{ $value | printf "%.1f" }}%'
+
+      # 磁盘空间严重不足 10%
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: '磁盘空间严重不足'
+          description: '实例 {{ $labels.instance }} 根分区仅剩 {{ $value | printf "%.1f" }}%，请立即清理'
+
+      # 主机宕机（Node Exporter 无响应）
+      - alert: HostDown
+        expr: up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: '主机监控离线'
+          description: 'Node Exporter 无响应，主机可能宕机或网络中断'
+
+  # ──────────────────────────────────────────────
+  # Docker 容器告警
+  # ──────────────────────────────────────────────
+  - name: container_alerts
+    rules:
+      # Echo 容器停止运行
+      # 为什么监控这个：业务容器宕机直接影响用户
+      - alert: EchoContainerDown
+        expr: absent(container_last_seen{name=~"echo-(frontend|backend|db)-.*"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Echo 容器停止运行'
+          description: 'Echo IM 核心容器 {{ $labels.name }} 已停止超过 1 分钟'
+
+      # 容器 CPU 使用率过高
+      - alert: ContainerHighCpu
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '容器 CPU 使用率过高'
+          description: '容器 {{ $labels.name }} CPU 使用率 {{ $value | printf "%.1f" }}%'
+
+      # 容器内存使用率过高
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""} > 0.9) and container_spec_memory_limit_bytes{name!=""} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: '容器内存使用率过高'
+          description: '容器 {{ $labels.name }} 内存使用已达限制的 {{ $value | printf "%.1f" }}%'
+
+      # 容器频繁重启（5 分钟内重启超过 2 次）
+      - alert: ContainerRestartLoop
+        expr: increase(container_restart_count{name!=""}[5m]) > 2
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: '容器频繁重启'
+          description: '容器 {{ $labels.name }} 在 5 分钟内重启了 {{ $value }} 次'
+
+  # ──────────────────────────────────────────────
+  # PostgreSQL 告警
+  # ──────────────────────────────────────────────
+  - name: postgresql_alerts
+    rules:
+      # PostgreSQL 连接数过高（超过 80）
+      # 为什么：默认 max_connections=100，接近上限会导致新连接失败
+      - alert: PostgresqlHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'PostgreSQL 连接数过高'
+          description: '当前连接数 {{ $value }}，接近上限'
+
+      # PostgreSQL 缓存命中率低于 90%
+      # 为什么：命中率低说明频繁从磁盘读取，性能差
+      - alert: PostgresqlLowCacheHitRate
+        expr: pg_stat_database_blks_hit / (pg_stat_database_blks_hit + pg_stat_database_blks_read) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'PostgreSQL 缓存命中率低'
+          description: '缓存命中率 {{ $value | printf "%.2f" }}%，建议检查 shared_buffers 配置'
+
+      # PostgreSQL Exporter 无响应
+      - alert: PostgresqlExporterDown
+        expr: up{job="postgresql"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'PostgreSQL 监控离线'
+          description: '无法连接到 PostgreSQL Exporter'
+
+  # ──────────────────────────────────────────────
+  # Prometheus 自身告警
+  # ──────────────────────────────────────────────
+  - name: prometheus_alerts
+    rules:
+      # Prometheus 采集目标失败
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: '采集目标不可达'
+          description: 'Job {{ $labels.job }} 的 {{ $labels.instance }} 无法采集'
+
+      # Prometheus 存储空间即将用完
+      - alert: PrometheusStorageFilling
+        expr: (prometheus_tsdb_storage_blocks_bytes / (1024*1024*1024)) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Prometheus 存储占用较大'
+          description: '当前存储占用 {{ $value | printf "%.1f" }}GB，考虑缩短保留时间'
