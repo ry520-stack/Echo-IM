@@ -24,11 +24,12 @@ html, body, #root {
 .app-boot-fallback {
   min-height: 100vh;
   min-height: 100dvh;
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
   padding: 24px;
   background: #f8fafc;
   color: #111827;
@@ -36,68 +37,82 @@ html, body, #root {
   text-align: center;
 }
 
-.app-boot-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: #ffffff;
-  font-size: 38px;
-  font-weight: 900;
-  box-shadow: 0 18px 44px rgba(99, 102, 241, 0.32);
-}
-
-.app-boot-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #6b7280;
-}
-
-.app-boot-title {
-  margin-top: 6px;
-  font-size: 40px;
-  line-height: 1;
-  font-weight: 900;
-  letter-spacing: -0.04em;
-}
-
-.app-boot-subtitle {
-  max-width: 280px;
-  font-size: 15px;
-  line-height: 1.7;
-  color: #6b7280;
+.app-boot-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 288px;
+  height: 288px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  filter: blur(54px);
+  pointer-events: none;
 }
 
 .app-boot-card {
-  width: min(100%, 360px);
+  position: relative;
+  z-index: 1;
+  width: min(100%, 320px);
   border-radius: 28px;
-  border: 1px solid rgba(255, 255, 255, .8);
-  background: rgba(255, 255, 255, .76);
+  background: #ffffff;
   padding: 28px;
-  box-shadow: 0 24px 80px rgba(99, 102, 241, .14);
-  backdrop-filter: blur(18px);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
+.app-boot-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  font-size: 30px;
+  font-weight: 900;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.22);
+}
+
+.app-boot-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.app-boot-title {
+  margin-top: 20px;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.app-boot-subtitle {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
 .app-boot-status {
   margin-top: 28px;
   width: 100%;
-  border-radius: 20px;
-  background: #f7f8fa;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .app-boot-progress {
   margin-top: 14px;
-  height: 6px;
+  width: 180px;
+  height: 4px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e0e7ff;
+  background: #e5e7eb;
 }
 
 .app-boot-progress::before {
@@ -110,42 +125,41 @@ html, body, #root {
   animation: echoProgress 1.4s ease-in-out infinite;
 }
 
-.app-boot-dots {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-}
-
-.app-boot-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #6366f1;
-  animation: echoDot 1s ease-in-out infinite;
-}
-
-.app-boot-dots span:nth-child(2) { animation-delay: .15s; background: #7c3aed; }
-.app-boot-dots span:nth-child(3) { animation-delay: .3s; background: #8b5cf6; }
-
 .app-boot-footer {
   position: fixed;
   left: 24px;
   right: 24px;
   bottom: 24px;
   font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
+  font-weight: 500;
+  color: #9ca3af;
 }
 
 .app-boot-button {
   border: 0;
   border-radius: 14px;
-  padding: 10px 18px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.app-boot-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.app-boot-button-primary {
   background: linear-gradient(90deg, #6366f1, #8b5cf6);
   color: #ffffff;
-  font-size: 14px;
-  font-weight: 700;
+}
+
+.app-boot-button-secondary {
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #374151;
 }
 
 @keyframes echoProgress {
@@ -154,10 +168,6 @@ html, body, #root {
   100% { transform: translateX(220%); }
 }
 
-@keyframes echoDot {
-  0%, 100% { transform: translateY(0); opacity: .35; }
-  50% { transform: translateY(-4px); opacity: 1; }
-}
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {

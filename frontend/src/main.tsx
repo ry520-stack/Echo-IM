@@ -18,16 +18,20 @@ try {
   if (rootEl) {
     rootEl.innerHTML = `
       <div class="app-boot-fallback">
+        <div class="app-boot-glow"></div>
         <div class="app-boot-card">
           <div class="app-boot-logo">E</div>
           <div class="app-boot-title">Echo</div>
-          <div class="app-boot-subtitle">新一代轻量级即时通讯空间</div>
+          <div class="app-boot-subtitle">轻量级即时通讯空间</div>
           <div class="app-boot-status">
-            <div class="app-boot-text">Echo 服务连接失败</div>
-            <button class="app-boot-button" style="margin-top:14px;height:48px;width:100%;" onclick="location.reload()">重试</button>
+            <div class="app-boot-text">连接服务失败</div>
+            <div class="app-boot-actions">
+              <button class="app-boot-button app-boot-button-primary" onclick="location.reload()">重试</button>
+              <button class="app-boot-button app-boot-button-secondary" onclick="location.assign('/#/login')">体验模式</button>
+            </div>
           </div>
         </div>
-        <div class="app-boot-footer">Echo IM · Real-time Communication Platform</div>
+        <div class="app-boot-footer">Echo IM · Modern Communication Platform</div>
       </div>
     `;
   }
