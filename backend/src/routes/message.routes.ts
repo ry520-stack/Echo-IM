@@ -8,6 +8,7 @@ router.use(authenticate);
 router.get('/conversations', messageController.getConversations);
 router.get('/search', messageController.searchMessages);
 router.get('/consecutive-days', messageController.consecutiveDays);
+router.get('/context/:id', messageController.getMessageContext);
 router.get('/group', messageController.getGroupMessages);
 router.get('/', messageController.getMessages);
 router.put('/read', messageController.markRead);

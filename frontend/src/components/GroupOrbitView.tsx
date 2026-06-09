@@ -1,8 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays, Search, Users, Crown, Shield, MessageCircle, Image as ImageIcon } from 'lucide-react';
 import { api } from '../api/client';
 import { assetUrl } from '../utils/assetUrl';
+import { useSocket } from '../contexts/SocketContext';
 
 interface GroupMember {
   userId: string;
@@ -25,21 +26,48 @@ interface GroupDetail {
 
 export default function GroupOrbitView({ groupId, groupName, onClose }: { groupId: string; groupName?: string; onClose: () => void }) {
   const navigate = useNavigate();
+  const { socket } = useSocket();
   const [group, setGroup] = useState<GroupDetail | null>(null);
+  const swipeRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    api<GroupDetail>('GET', `/api/groups/${groupId}`).then(setGroup).catch(() => {});
-  }, [groupId]);
+    const refreshGroup = () => api<GroupDetail>('GET', `/api/groups/${groupId}`).then(setGroup).catch(() => {});
+    const handleGroupUpdated = (data: { groupId?: string; action?: string }) => {
+      if (data.groupId !== groupId) return;
+      if (data.action === 'dismissed' || data.action === 'access-revoked') {
+        onClose();
+        return;
+      }
+      refreshGroup();
+    };
+    refreshGroup();
+    socket?.on('group:updated', handleGroupUpdated);
+    return () => {
+      socket?.off('group:updated', handleGroupUpdated);
+    };
+  }, [groupId, onClose, socket]);
 
   const name = group?.name || groupName || '群聊';
   const owner = group?.members.find(m => m.role === 'owner');
   const admins = group?.members.filter(m => m.role === 'admin') || [];
 
   return (
-    <div className="fixed inset-0 z-[70] overflow-y-auto bg-white dark:bg-gray-950">
+    <div
+      className="fixed inset-0 z-[70] overflow-y-auto bg-white dark:bg-gray-950"
+      onTouchStart={(e) => {
+        e.stopPropagation();
+        swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }}
+      onTouchEnd={(e) => {
+        e.stopPropagation();
+        const dx = e.changedTouches[0].clientX - swipeRef.current.x;
+        const dy = Math.abs(e.changedTouches[0].clientY - swipeRef.current.y);
+        if (dx > 50 && dx > dy) onClose();
+      }}
+    >
       <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-gray-100 bg-white/90 px-4 backdrop-blur dark:border-gray-800 dark:bg-gray-950/90">
         <button onClick={onClose} className="rounded-xl p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">←</button>
-        <h1 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">群星域</h1>
+        <h1 className="truncate text-lg font-bold text-gray-900 dark:text-gray-100">群资料</h1>
       </header>
 
       <main className="px-5 pb-10 pt-8">

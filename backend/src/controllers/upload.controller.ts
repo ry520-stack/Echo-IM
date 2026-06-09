@@ -72,8 +72,9 @@ export async function uploadEmoji(req: Request, res: Response) {
   }
   const url = getUploadUrl(req.file.filename);
   const name = req.body.name || 'emoji';
+  const last = await prisma.emoji.findFirst({ where: { userId: req.userId }, orderBy: { sortOrder: 'desc' }, select: { sortOrder: true } });
   const emoji = await prisma.emoji.create({
-    data: { userId: req.userId, imageUrl: url, name },
+    data: { userId: req.userId, imageUrl: url, name, sortOrder: (last?.sortOrder || 0) + 1 },
   });
   res.status(201).json(emoji);
 }

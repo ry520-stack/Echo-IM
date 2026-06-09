@@ -2,8 +2,9 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { verifyToken } from './auth.service';
 import prisma from '../utils/prisma';
-import * as blockService from './block.service';
 import { canSendPrivateMessage, canInteractWithUser } from './messagePermission.service';
+
+const PET_EXP_PER_LEVEL = 120;
 import { pushToUsers } from './push.service';
 
 let io: Server | null = null;
@@ -24,53 +25,59 @@ function previewMessage(type: string, content: string) {
   if (type === 'voice') return '[\u8bed\u97f3]';
   if (type === 'video') return '[\u89c6\u9891]';
   if (type === 'call') return content || '[\u901a\u8bdd]';
-  if (type === 'pet') return content || '[Echo Pet]';
   return content.length > 60 ? content.slice(0, 60) + '...' : content;
 }
 
-const petLines = [
-  '我听见你们的回声啦。',
-  '今天的小火苗还亮着。',
-  '你们刚刚聊得很热闹。',
-  '我在这里陪你们聊天。',
-  '回声宠物冒个泡。'
-];
+function petMessageAction(content: string) {
+  if (/晚安|good\s*night/i.test(content)) return 'sleep';
+  if (/哈哈|笑死|hhh|😂|🤣/i.test(content)) return 'laugh';
+  return '';
+}
 
-async function maybeSendPetMessage(params: { senderId: string; receiverId?: string; messageType?: string }) {
-  if (!params.receiverId || params.messageType === 'pet' || params.messageType === 'call') return;
-  const recentCount = await prisma.message.count({
+async function growPetFromMessage(params: { senderId: string; receiverId?: string; messageType?: string }) {
+  if (!params.receiverId || params.messageType === 'call' || params.messageType === 'pet') return;
+  const [userAId, userBId] = params.senderId < params.receiverId
+    ? [params.senderId, params.receiverId]
+    : [params.receiverId, params.senderId];
+  const bond = await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId, userBId } } });
+  if (!bond || bond.status !== 'active') return;
+  const messageCount = await prisma.message.count({
     where: {
       OR: [
         { senderId: params.senderId, receiverId: params.receiverId },
         { senderId: params.receiverId, receiverId: params.senderId },
       ],
-      type: { not: 'pet' },
-      createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+      type: { notIn: ['pet', 'call'] },
     },
   });
-  const recentPet = await prisma.message.findFirst({
+  const now = new Date();
+  const chinaNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  chinaNow.setUTCHours(0, 0, 0, 0);
+  const todayStart = new Date(chinaNow.getTime() - 8 * 60 * 60 * 1000);
+  const todayMessageCount = await prisma.message.count({
     where: {
       OR: [
-        { senderId: params.senderId, receiverId: params.receiverId, type: 'pet' },
-        { senderId: params.receiverId, receiverId: params.senderId, type: 'pet' },
+        { senderId: params.senderId, receiverId: params.receiverId },
+        { senderId: params.receiverId, receiverId: params.senderId },
       ],
-      createdAt: { gte: new Date(Date.now() - 8 * 60 * 1000) },
+      type: { notIn: ['pet', 'call'] },
+      createdAt: { gte: todayStart },
     },
-    select: { id: true },
   });
-  if (recentPet || recentCount < 3 || recentCount % 5 !== 0) return;
-
-  const content = petLines[Math.floor(recentCount / 5) % petLines.length];
-  const petMsg = await saveMessage({
-    senderId: params.senderId,
-    receiverId: params.receiverId,
-    content,
-    type: 'pet',
+  const dailyBonus = todayMessageCount === 5 ? 3 : todayMessageCount === 15 ? 5 : todayMessageCount === 30 ? 8 : 0;
+  const experience = bond.experience + 1 + dailyBonus;
+  const updated = await prisma.petBond.update({
+    where: { id: bond.id },
+    data: {
+      experience,
+      intimacy: bond.intimacy + (messageCount % 5 === 0 ? 1 : 0) + (dailyBonus ? 1 : 0),
+      level: Math.max(bond.level, Math.floor(experience / PET_EXP_PER_LEVEL) + 1),
+      lastSpokeAt: now,
+    },
   });
-  if (petMsg) {
-    io?.to(`user:${params.senderId}`).emit('message:receive', petMsg);
-    io?.to(`user:${params.receiverId}`).emit('message:receive', petMsg);
-  }
+  const payload = { peerId: params.receiverId, action: 'grew', pet: updated };
+  io?.to(`user:${params.senderId}`).emit('pet:updated', payload);
+  io?.to(`user:${params.receiverId}`).emit('pet:updated', { ...payload, peerId: params.senderId });
 }
 
 function pushOfflineMessage(params: {
@@ -190,35 +197,6 @@ export function initSocket(httpServer: HttpServer) {
             return ack?.({ error: perm.code, message: perm.message });
           }
 
-          // 陌生人自动回复（仅当非好友且允许陌生人消息时）
-          if (!perm.isFriend) {
-            const receiver = await prisma.user.findUnique({
-              where: { id: data.receiverId },
-              select: { autoReply: true },
-            });
-            if (receiver?.autoReply) {
-              // 30分钟防刷：检查最近一条 Auto 消息
-              const recentAuto = await prisma.message.findFirst({
-                where: {
-                  senderId: data.receiverId,
-                  receiverId: userId,
-                  content: { startsWith: '[Auto]' },
-                  createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
-                },
-              });
-              if (!recentAuto) {
-                const autoMsg = await saveMessage({
-                  senderId: data.receiverId,
-                  receiverId: userId,
-                  content: '[Auto] ' + receiver.autoReply,
-                  type: 'text',
-                });
-                if (autoMsg) {
-                  io?.to(`user:${userId}`).emit('message:receive', autoMsg);
-                }
-              }
-            }
-          }
         }
 
         // 群聊：校验群成员
@@ -262,7 +240,12 @@ export function initSocket(httpServer: HttpServer) {
             });
           }
           ack?.({ ok: true, message: msg });
-          maybeSendPetMessage({ senderId: userId, receiverId: data.receiverId, messageType: data.type || 'text' }).catch(() => {});
+          growPetFromMessage({ senderId: userId, receiverId: data.receiverId, messageType: data.type || 'text' }).catch(() => {});
+          const petAction = data.receiverId ? petMessageAction(data.content) : '';
+          if (petAction && data.receiverId) {
+            io?.to(`user:${userId}`).emit('pet:interaction', { peerId: data.receiverId, action: petAction });
+            io?.to(`user:${data.receiverId}`).emit('pet:interaction', { peerId: userId, action: petAction });
+          }
         }
       } catch (e: any) {
         ack?.({ error: 'INTERNAL_ERROR', message: e.message || 'send failed' });
@@ -280,7 +263,7 @@ export function initSocket(httpServer: HttpServer) {
     });
 
     // --- WebRTC signaling ---
-    socket.on('call:request', async (data: { receiverId: string; callerName: string; callerAvatar: string }, ack?: (res: any) => void) => {
+    socket.on('call:request', async (data: { callId?: string; receiverId: string; callerName: string; callerAvatar: string }, ack?: (res: any) => void) => {
       const perm = await canSendPrivateMessage(userId, data.receiverId);
       if (!perm.ok || !perm.isFriend) {
         return ack?.({ ok: false, code: perm.code || 'FRIEND_REQUIRED', message: perm.message || '只有好友才能语音通话' });
@@ -290,6 +273,7 @@ export function initSocket(httpServer: HttpServer) {
         prisma.user.findUnique({ where: { id: data.receiverId }, select: { callRingtoneUrl: true } }),
       ]);
       socket.to(`user:${data.receiverId}`).emit('call:invite', {
+        callId: data.callId,
         senderId: userId,
         callerName: data.callerName,
         callerAvatar: data.callerAvatar,
@@ -304,24 +288,34 @@ export function initSocket(httpServer: HttpServer) {
       });
     });
 
-    socket.on('call:accept', async (data: { targetId: string }) => {
-      const ok = await canInteractWithUser(userId, data.targetId);
-      if (ok) socket.to(`user:${data.targetId}`).emit('call:accepted');
+    socket.on('pet:interact', async (data: { peerId: string; action: 'poke' | 'feed' }) => {
+      if (!data.peerId || !['poke', 'feed'].includes(data.action)) return;
+      const [userAId, userBId] = userId < data.peerId ? [userId, data.peerId] : [data.peerId, userId];
+      const bond = await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId, userBId } } });
+      if (!bond || bond.status !== 'active' || !await canInteractWithUser(userId, data.peerId)) return;
+      const payload = { peerId: data.peerId, action: data.action, actorId: userId };
+      io?.to(`user:${userId}`).emit('pet:interaction', payload);
+      io?.to(`user:${data.peerId}`).emit('pet:interaction', { ...payload, peerId: userId });
     });
 
-    socket.on('call:reject', async (data: { targetId: string }) => {
+    socket.on('call:accept', async (data: { targetId: string; callId?: string }) => {
       const ok = await canInteractWithUser(userId, data.targetId);
-      if (ok) socket.to(`user:${data.targetId}`).emit('call:rejected');
+      if (ok) socket.to(`user:${data.targetId}`).emit('call:accepted', { callId: data.callId, senderId: userId });
     });
 
-    socket.on('call:hangup', async (data: { targetId: string }) => {
+    socket.on('call:reject', async (data: { targetId: string; callId?: string }) => {
       const ok = await canInteractWithUser(userId, data.targetId);
-      if (ok) socket.to(`user:${data.targetId}`).emit('call:hangedup');
+      if (ok) socket.to(`user:${data.targetId}`).emit('call:rejected', { callId: data.callId, senderId: userId });
     });
 
-    socket.on('webrtc:signal', async (data: { targetId: string; signal: any }) => {
+    socket.on('call:hangup', async (data: { targetId: string; callId?: string }) => {
       const ok = await canInteractWithUser(userId, data.targetId);
-      if (ok) socket.to(`user:${data.targetId}`).emit('webrtc:signal', { senderId: userId, signal: data.signal });
+      if (ok) socket.to(`user:${data.targetId}`).emit('call:hangedup', { callId: data.callId, senderId: userId });
+    });
+
+    socket.on('webrtc:signal', async (data: { targetId: string; callId?: string; signal: any }) => {
+      const ok = await canInteractWithUser(userId, data.targetId);
+      if (ok) socket.to(`user:${data.targetId}`).emit('webrtc:signal', { callId: data.callId, senderId: userId, signal: data.signal });
     });
 
     // --- read receipt ---

@@ -44,6 +44,9 @@ export async function unregisterDevice(userId: string, clientId: string) {
 }
 
 export async function pushToUsers(input: PushMessageInput) {
+  if (process.env.OFFLINE_PUSH_ENABLED !== 'true') {
+    return { skipped: true, reason: 'offline push disabled' };
+  }
   const webhookUrl = process.env.UNIPUSH_WEBHOOK_URL;
   if (!webhookUrl) return { skipped: true, reason: 'UNIPUSH_WEBHOOK_URL not configured' };
 

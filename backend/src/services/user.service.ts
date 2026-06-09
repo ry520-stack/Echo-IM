@@ -3,13 +3,13 @@ import prisma from '../utils/prisma';
 export async function getUser(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new Error('用户不存在');
-  const { password, ...safe } = user;
+  const { password, autoReply, ...safe } = user;
   return safe;
 }
 
 export async function updateUser(
   userId: string,
-  data: { nickname?: string; avatar?: string; status?: string; autoReply?: string; allowStrangerMessage?: boolean; readReceiptsEnabled?: boolean; callRingtoneUrl?: string; callRingtoneMode?: string }
+  data: { nickname?: string; avatar?: string; status?: string; allowStrangerMessage?: boolean; readReceiptsEnabled?: boolean; callRingtoneUrl?: string; callRingtoneMode?: string }
 ) {
   if (data.callRingtoneMode && !['peer', 'mine'].includes(data.callRingtoneMode)) {
     throw new Error('Invalid ringtone mode');
@@ -18,7 +18,7 @@ export async function updateUser(
     where: { id: userId },
     data,
   });
-  const { password, ...safe } = user;
+  const { password, autoReply, ...safe } = user;
   return safe;
 }
 
@@ -40,7 +40,7 @@ export async function searchUsers(query: string) {
     select: {
       id: true, username: true, digitalId: true,
       nickname: true, avatar: true, status: true, lastSeenAt: true,
-      autoReply: true, allowStrangerMessage: true, readReceiptsEnabled: true,
+      allowStrangerMessage: true, readReceiptsEnabled: true,
       callRingtoneUrl: true, callRingtoneMode: true,
       bgConversation: true, bgGravity: true, bgChat: true,
     },

@@ -9,7 +9,6 @@ interface User {
   nickname: string;
   avatar: string;
   status: string;
-  autoReply: string;
   allowStrangerMessage: boolean;
   callRingtoneUrl?: string;
   callRingtoneMode?: 'peer' | 'mine';

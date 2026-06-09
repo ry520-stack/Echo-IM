@@ -20,12 +20,12 @@ export async function getGroupDetail(req: Request, res: Response) {
 }
 
 export async function createGroup(req: Request, res: Response) {
-  const { name, memberIds, avatar } = req.body;
+  const { name, memberIds, avatar, notice } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: '群组名称为必填' });
   }
   try {
-    const group = await groupService.createGroup(req.userId, name.trim(), memberIds || [], avatar || undefined);
+    const group = await groupService.createGroup(req.userId, name.trim(), memberIds || [], avatar || undefined, notice?.trim() || undefined);
     res.status(201).json(group);
   } catch (e: any) {
     res.status(400).json({ error: e.message });

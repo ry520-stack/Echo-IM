@@ -14,7 +14,7 @@ interface Peer {
 }
 interface LastMessage { id: string; content: string; type: string; createdAt: string; senderId: string; }
 interface Conversation { type?: 'user' | 'group'; peer: Peer; lastMessage: LastMessage | null; unreadCount: number; lastTime: string; }
-interface Friend { id: string; peer: Peer; alias: string; isPinned: boolean; createdAt: string; }
+interface Friend { id: string; peer: Peer; alias: string; isPinned: boolean; createdAt: string; chatStreak?: number; }
 
 const PINNED_KEY = 'echo-pinned-chats';
 const ARCHIVED_KEY = 'echo-archived-chats';
@@ -43,6 +43,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
   const [archived, setArchived] = useState<Set<string>>(getArchived());
   const [friends, setFriends] = useState<Friend[]>([]);
   const [userResults, setUserResults] = useState<Peer[]>([]);
+  const [chatStreaks, setChatStreaks] = useState<Record<string, number>>({});
 
   // 长按 / 滑动状态
   const [swipeId, setSwipeId] = useState<string | null>(null);
@@ -146,7 +147,12 @@ export default function ConversationList({ searchText, searchTab }: { searchText
     catch { /* */ } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
+  const fetchChatStreaks = useCallback(() => {
+    api<Friend[]>('GET', '/api/friends')
+      .then(items => setChatStreaks(Object.fromEntries(items.map(item => [item.peer.id, item.chatStreak || 0]))))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { fetchConversations(); fetchChatStreaks(); }, [fetchConversations, fetchChatStreaks]);
   useEffect(() => { const onVisible = () => { if (document.visibilityState === 'visible') fetchConversations(); }; document.addEventListener('visibilitychange', onVisible); return () => document.removeEventListener('visibilitychange', onVisible); }, [fetchConversations]);
 
   // 长按定时器卸载清理
@@ -222,9 +228,13 @@ export default function ConversationList({ searchText, searchTab }: { searchText
     };
     socket.on('message:receive', handleMessage);
     socket.on('group:updated', fetchConversations);
+    socket.on('relationship:updated', fetchConversations);
+    socket.on('friend:removed', fetchConversations);
     return () => {
       socket.off('message:receive', handleMessage);
       socket.off('group:updated', fetchConversations);
+      socket.off('relationship:updated', fetchConversations);
+      socket.off('friend:removed', fetchConversations);
     };
   }, [socket, user?.id, chatId, fetchConversations]);
 
@@ -288,7 +298,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
           ) : msgResults.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-4">未找到相关消息</p>
           ) : msgResults.map((msg: any) => (
-            <div key={msg.id} onClick={() => nav(`/chat/${msg.groupId || (msg.senderId === user?.id ? msg.receiverId : msg.senderId)}`)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer mb-1">
+            <div key={msg.id} onClick={() => nav(`/chat/${msg.groupId || (msg.senderId === user?.id ? msg.receiverId : msg.senderId)}?focus=${msg.id}`)} className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer mb-1">
               <p className="text-xs text-gray-500 truncate">{msg.group?.name ? `${msg.group.name} · ` : ''}{msg.sender?.nickname || msg.sender?.username}</p>
               <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{formatSearchMsg(msg)}</p>
             </div>
@@ -325,6 +335,8 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                 const isOnline = !conv.peer.isGroup && onlineUsers.has(conv.peer.id);
                 const isPinned = pinned.has(conv.peer.id);
                 const isSwiping = swipeId === conv.peer.id;
+                const streak = conv.peer.isGroup ? 0 : (chatStreaks[conv.peer.id] || 0);
+                const streakTone = streak >= 90 ? 'bg-rose-50 text-rose-500 ring-rose-100 dark:bg-rose-950/25 dark:ring-rose-900/40' : streak >= 30 ? 'bg-amber-50 text-amber-600 ring-amber-100 dark:bg-amber-950/25 dark:ring-amber-900/40' : streak >= 7 ? 'bg-violet-50 text-violet-500 ring-violet-100 dark:bg-violet-950/25 dark:ring-violet-900/40' : 'bg-slate-100 text-slate-500 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700';
                 return (
                   <div key={conv.peer.id} data-conv-card className="relative overflow-hidden select-none">
                     <div className="absolute inset-y-0 left-0 flex items-center pointer-events-none">
@@ -354,7 +366,10 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between">
-                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{getDisplayName(conv.peer)}</span>
+                          <span className="flex min-w-0 items-center gap-1 text-sm font-medium text-gray-800 dark:text-gray-200">
+                            <span className="truncate">{getDisplayName(conv.peer)}</span>
+                            {streak >= 3 && <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ring-1 ${streakTone}`}>{`${streak}天`}</span>}
+                          </span>
                           {conv.lastMessage && <span className="ml-2 shrink-0 text-[10px] text-gray-400">{formatTime(conv.lastMessage.createdAt)}</span>}
                         </div>
                         <div className="flex items-center justify-between">

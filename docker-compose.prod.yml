@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-echo_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-echo_pass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       POSTGRES_DB: ${DB_NAME:-echo_db}
     ports:
       - '5433:5432'
@@ -49,7 +49,7 @@ services:
     volumes:
       - uploads:/app/uploads
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-echo_user}:${DB_PASSWORD:-echo_pass}@db:5432/${DB_NAME:-echo_db}
+      DATABASE_URL: postgresql://${DB_USER:-echo_user}:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/${DB_NAME:-echo_db}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       RESEND_API_KEY: ${RESEND_API_KEY}
@@ -59,6 +59,7 @@ services:
       QQ_SMTP_PASS: ${QQ_SMTP_PASS}
       UNIPUSH_WEBHOOK_URL: ${UNIPUSH_WEBHOOK_URL}
       UNIPUSH_WEBHOOK_SECRET: ${UNIPUSH_WEBHOOK_SECRET}
+      OFFLINE_PUSH_ENABLED: ${OFFLINE_PUSH_ENABLED:-false}
       PORT: '3001'
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
       # 如启用 Redis，取消下面的注释：

@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
+import { canAccessConversation } from './messagePermission.service';
 
 export async function getMessages(
   userId: string,
@@ -7,6 +8,10 @@ export async function getMessages(
   before?: string,
   limit = 50,
 ) {
+  if (!await canAccessConversation(userId, peerId)) {
+    throw new Error('No permission to access this conversation');
+  }
+
   // Get the conversation clear time for this user-peer pair
   const clearRecord = await prisma.userConversationClear.findUnique({
     where: { userId_peerId: { userId, peerId } },
@@ -318,6 +323,10 @@ export async function recallMessage(messageId: string, userId: string) {
 }
 
 export async function getConsecutiveDays(userId: string, peerId: string): Promise<number> {
+  if (!await canAccessConversation(userId, peerId)) {
+    throw new Error('No permission to access this conversation');
+  }
+
   // 只查最�?65天的消息，避免全量加�?
   const oneYearAgo = new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -367,6 +376,8 @@ export async function searchMessages(
   options: { query?: string; peerId?: string; groupId?: string; date?: string },
   limit = 60,
 ) {
+  if (options.peerId && !await canAccessConversation(userId, options.peerId)) return [];
+
   const query = options.query?.trim();
   const dayStart = options.date ? new Date(`${options.date}T00:00:00+08:00`) : null;
   const dayEnd = dayStart ? new Date(dayStart.getTime() + 24 * 60 * 60 * 1000) : null;
@@ -376,6 +387,7 @@ export async function searchMessages(
     select: { groupId: true },
   });
   const groupIds = memberships.map(m => m.groupId);
+  const accessibleGroupIds = new Set(groupIds);
   if (options.groupId && !groupIds.includes(options.groupId)) return [];
 
   const hiddenIds = await prisma.messageHidden.findMany({
@@ -414,8 +426,109 @@ export async function searchMessages(
     },
   });
 
-  return messages.filter(m => !hiddenSet.has(m.id));
+  const privatePeerIds = [...new Set(messages.flatMap(message => {
+    if (message.groupId) return [];
+    return [message.senderId === userId ? message.receiverId : message.senderId].filter((id): id is string => !!id);
+  }))];
+  const [peerAccess, userClears, groupClears] = await Promise.all([
+    Promise.all(privatePeerIds.map(async peerId => ({
+      peerId,
+      allowed: await canAccessConversation(userId, peerId),
+    }))),
+    privatePeerIds.length
+      ? prisma.userConversationClear.findMany({
+          where: { userId, peerId: { in: privatePeerIds } },
+          select: { peerId: true, clearedAt: true },
+        })
+      : Promise.resolve([]),
+    groupIds.length
+      ? prisma.groupConversationClear.findMany({
+          where: { userId, groupId: { in: groupIds } },
+          select: { groupId: true, clearedAt: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const accessiblePrivatePeers = new Set(peerAccess.filter(item => item.allowed).map(item => item.peerId));
+  const userClearMap = new Map(userClears.map(item => [item.peerId, item.clearedAt]));
+  const groupClearMap = new Map(groupClears.map(item => [item.groupId, item.clearedAt]));
+
+  return messages.filter(message => {
+    if (hiddenSet.has(message.id)) return false;
+    if (message.groupId) {
+      if (!accessibleGroupIds.has(message.groupId)) return false;
+      const clearedAt = groupClearMap.get(message.groupId);
+      return !clearedAt || message.createdAt > clearedAt;
+    }
+    const peerId = message.senderId === userId ? message.receiverId : message.senderId;
+    if (!peerId || !accessiblePrivatePeers.has(peerId)) return false;
+    const clearedAt = userClearMap.get(peerId);
+    return !clearedAt || message.createdAt > clearedAt;
+  });
 }
+
+export async function getMessageContext(userId: string, messageId: string, radius = 25) {
+  const target = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!target) throw new Error('Message not found');
+
+  const groupMember = target.groupId
+    ? await prisma.groupMember.findUnique({ where: { groupId_userId: { groupId: target.groupId, userId } } })
+    : null;
+  const peerId = target.senderId === userId ? target.receiverId : target.senderId;
+  if (target.groupId ? !groupMember : !peerId || !await canAccessConversation(userId, peerId)) {
+    throw new Error('No permission to access this conversation');
+  }
+
+  const [hiddenIds, userClear, groupClear] = await Promise.all([
+    prisma.messageHidden.findMany({ where: { userId }, select: { messageId: true } }),
+    peerId
+      ? prisma.userConversationClear.findUnique({ where: { userId_peerId: { userId, peerId } }, select: { clearedAt: true } })
+      : Promise.resolve(null),
+    target.groupId
+      ? prisma.groupConversationClear.findUnique({ where: { userId_groupId: { userId, groupId: target.groupId } }, select: { clearedAt: true } })
+      : Promise.resolve(null),
+  ]);
+  const hiddenSet = new Set(hiddenIds.map(item => item.messageId));
+  const clearedAt = userClear?.clearedAt || groupClear?.clearedAt;
+  if (hiddenSet.has(target.id) || (clearedAt && target.createdAt <= clearedAt)) {
+    throw new Error('Message is no longer available');
+  }
+
+  const conversationWhere = target.groupId
+    ? { groupId: target.groupId }
+    : {
+        OR: [
+          { senderId: userId, receiverId: peerId },
+          { senderId: peerId!, receiverId: userId },
+        ],
+      };
+  const include = {
+    sender: { select: { id: true, username: true, nickname: true, avatar: true } },
+    replyTo: {
+      select: { id: true, content: true, type: true, sender: { select: { id: true, username: true, nickname: true } } },
+    },
+    readReceipts: { select: { userId: true, readAt: true } },
+  };
+  const [beforeAndTarget, after] = await Promise.all([
+    prisma.message.findMany({
+      where: { ...conversationWhere, createdAt: { lte: target.createdAt } },
+      orderBy: { createdAt: 'desc' },
+      take: radius + 1,
+      include,
+    }),
+    prisma.message.findMany({
+      where: { ...conversationWhere, createdAt: { gt: target.createdAt } },
+      orderBy: { createdAt: 'asc' },
+      take: radius,
+      include,
+    }),
+  ]);
+
+  return [...beforeAndTarget.reverse(), ...after].filter(message => {
+    if (hiddenSet.has(message.id)) return false;
+    return !clearedAt || message.createdAt > clearedAt;
+  });
+}
+
 export async function markAllRead(userId: string, peerId?: string, groupId?: string) {
   const me = await prisma.user.findUnique({
     where: { id: userId },
@@ -453,6 +566,9 @@ export async function markAllRead(userId: string, peerId?: string, groupId?: str
   }
 
   if (!peerId) throw new Error('peerId or groupId required');
+  if (!await canAccessConversation(userId, peerId)) {
+    throw new Error('No permission to access this conversation');
+  }
   const unreadMessages = await prisma.message.findMany({
     where: {
       senderId: peerId,
@@ -492,7 +608,10 @@ export async function hideMessage(userId: string, messageId: string) {
   // Verify the message involves this user
   const msg = await prisma.message.findUnique({ where: { id: messageId } });
   if (!msg) throw new Error('Message not found');
-  const involved = msg.senderId === userId || msg.receiverId === userId;
+  const groupMember = msg.groupId
+    ? await prisma.groupMember.findUnique({ where: { groupId_userId: { groupId: msg.groupId, userId } } })
+    : null;
+  const involved = msg.senderId === userId || msg.receiverId === userId || !!groupMember;
   if (!involved) throw new Error('No permission to modify this message');
 
   await prisma.messageHidden.upsert({
@@ -503,20 +622,26 @@ export async function hideMessage(userId: string, messageId: string) {
 }
 
 export async function batchHideMessages(userId: string, messageIds: string[]) {
-  let count = 0;
-  for (const messageId of messageIds) {
-    try {
-      await prisma.messageHidden.upsert({
-        where: { userId_messageId: { userId, messageId } },
-        create: { userId, messageId },
-        update: {},
-      });
-      count++;
-    } catch {
-      // Skip messages that don't exist or user isn't involved with
-    }
-  }
-  return count;
+  const uniqueIds = [...new Set(messageIds)];
+  const memberships = await prisma.groupMember.findMany({ where: { userId }, select: { groupId: true } });
+  const groupIds = memberships.map(membership => membership.groupId);
+  const messages = await prisma.message.findMany({
+    where: {
+      id: { in: uniqueIds },
+      OR: [
+        { senderId: userId },
+        { receiverId: userId },
+        ...(groupIds.length ? [{ groupId: { in: groupIds } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  await prisma.$transaction(messages.map(message => prisma.messageHidden.upsert({
+    where: { userId_messageId: { userId, messageId: message.id } },
+    create: { userId, messageId: message.id },
+    update: {},
+  })));
+  return messages.length;
 }
 
 export async function clearUserConversation(userId: string, peerId: string) {

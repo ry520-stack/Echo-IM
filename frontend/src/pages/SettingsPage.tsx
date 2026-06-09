@@ -8,6 +8,7 @@ import ToggleSwitch from '../components/ToggleSwitch';
 import { useBackground, type PageKey } from '../hooks/useBackground';
 import { Camera, ChevronLeft, LogOut, Image, Music, Palette, RotateCcw } from 'lucide-react';
 import { assetUrl } from '../utils/assetUrl';
+import { useSocket } from '../contexts/SocketContext';
 
 interface BlockEntry {
   id: string;
@@ -18,11 +19,11 @@ export default function SettingsPage() {
   const { user, token, logout, updateUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const toast = useToast();
+  const { socket } = useSocket();
   const nav = useNavigate();
 
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [status, setStatus] = useState(user?.status || '');
-  const [autoReply, setAutoReply] = useState(user?.autoReply || '');
   const [strangerMsg, setStrangerMsg] = useState(user?.allowStrangerMessage !== false);
   const [serverUrl, setServerUrlState] = useState(getServerUrl());
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,15 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    if (!socket) return;
+    const refreshBlockedUsers = () => api<BlockEntry[]>('GET', '/api/blocks').then(setBlockedUsers).catch(() => {});
+    socket.on('relationship:updated', refreshBlockedUsers);
+    return () => {
+      socket.off('relationship:updated', refreshBlockedUsers);
+    };
+  }, [socket]);
+
+  useEffect(() => {
     setRingtoneUrl(user?.callRingtoneUrl || localStorage.getItem('echo-call-ringtone-url') || '');
     setRingtoneMode(user?.callRingtoneMode || 'peer');
   }, [user?.callRingtoneUrl, user?.callRingtoneMode]);
@@ -55,14 +65,13 @@ export default function SettingsPage() {
     setSaving(true);
     setMsg('');
     try {
-      const updated = await api<any>('PUT', '/api/users/me', { nickname, status, autoReply, allowStrangerMessage: strangerMsg });
+      const updated = await api<any>('PUT', '/api/users/me', { nickname, status, allowStrangerMessage: strangerMsg });
       setMsg('保存成功');
       toast('个人资料已保存', 'success');
       const userKey = 'echo-user';
       const cached = JSON.parse(localStorage.getItem(userKey) || '{}');
       cached.nickname = updated.nickname;
       cached.status = updated.status;
-      cached.autoReply = updated.autoReply;
       cached.allowStrangerMessage = updated.allowStrangerMessage;
       localStorage.setItem(userKey, JSON.stringify(cached));
     } catch (e: any) {
@@ -270,16 +279,6 @@ export default function SettingsPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
               placeholder="写一句话..."
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition-colors focus:border-primary-300 focus:bg-white dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:bg-gray-700"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm text-gray-600 dark:text-gray-400">自动回复（留给陌生人）</label>
-            <input
-              type="text"
-              value={autoReply}
-              onChange={(e) => setAutoReply(e.target.value)}
-              placeholder="例如：稍后回复你，可加我好友"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition-colors focus:border-primary-300 focus:bg-white dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:bg-gray-700"
             />
           </div>

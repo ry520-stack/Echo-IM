@@ -1,4 +1,23 @@
 import prisma from '../utils/prisma';
+import { getIO } from './socket.service';
+
+function notifyRelationshipUpdated(userId: string, peerId: string, action: string) {
+  const io = getIO();
+  if (!io) return;
+  io.to(`user:${userId}`).emit('relationship:updated', { action, peerId });
+  io.to(`user:${peerId}`).emit('relationship:updated', { action, peerId: userId });
+}
+
+async function removeFriendGroupMemberships(userId: string, peerId: string) {
+  await prisma.friendGroupMember.deleteMany({
+    where: {
+      OR: [
+        { peerId, group: { userId } },
+        { peerId: userId, group: { userId: peerId } },
+      ],
+    },
+  });
+}
 
 export async function blockUser(blockerId: string, blockedId: string) {
   if (blockerId === blockedId) throw new Error('不能拉黑自己');
@@ -26,7 +45,9 @@ export async function blockUser(blockerId: string, blockedId: string) {
       blockedAt: new Date(),
     },
   });
+  await removeFriendGroupMemberships(blockerId, blockedId);
 
+  notifyRelationshipUpdated(blockerId, blockedId, 'blocked');
   return block;
 }
 
@@ -57,6 +78,7 @@ export async function unblockUser(blockerId: string, blockedId: string) {
       blockedAt: null,
     },
   });
+  notifyRelationshipUpdated(blockerId, blockedId, 'unblocked');
 }
 
 export async function getBlockedUsers(blockerId: string) {

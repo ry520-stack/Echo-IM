@@ -29,6 +29,7 @@ frontend/uploads/
 # Archives and local packages
 *.tar
 *.tar.gz
+*.tgz
 *.zip
 unpackage/
 Echo-HBX-5Plus/

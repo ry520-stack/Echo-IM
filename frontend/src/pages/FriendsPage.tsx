@@ -73,8 +73,21 @@ export default function FriendsPage() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('friend:request', () => fetchRequests());
-    return () => { socket.off('friend:request'); };
+    const refreshRequests = () => fetchRequests();
+    const refreshRelationships = () => {
+      fetchFriends();
+      fetchRequests();
+    };
+    socket.on('friend:request', refreshRequests);
+    socket.on('friend:accepted', refreshRelationships);
+    socket.on('friend:removed', refreshRelationships);
+    socket.on('relationship:updated', refreshRelationships);
+    return () => {
+      socket.off('friend:request', refreshRequests);
+      socket.off('friend:accepted', refreshRelationships);
+      socket.off('friend:removed', refreshRelationships);
+      socket.off('relationship:updated', refreshRelationships);
+    };
   }, [socket]);
 
   const searchUsers = async () => {
@@ -146,6 +159,7 @@ export default function FriendsPage() {
   };
 
   const blockFriend = async (userId: string) => {
+    if (!window.confirm('\u786e\u5b9a\u62c9\u9ed1\u8be5\u7528\u6237\u5417\uff1f\u62c9\u9ed1\u540e\u53cc\u65b9\u5c06\u65e0\u6cd5\u4e92\u53d1\u79c1\u804a\u6d88\u606f\u3002')) return;
     try {
       await api('POST', '/api/blocks/' + userId);
       toast('已拉黑', 'success');

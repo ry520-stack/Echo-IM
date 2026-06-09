@@ -1,8 +1,25 @@
 import prisma from '../utils/prisma';
 import * as socketService from './socket.service';
+import { canSendPrivateMessage } from './messagePermission.service';
 
 let schedulerStarted = false;
 let isProcessing = false;
+
+class DelayedPermissionError extends Error {}
+
+async function assertCanSend(senderId: string, receiverId?: string | null, groupId?: string | null) {
+  if (receiverId && groupId) throw new DelayedPermissionError('Only one target can be provided');
+  if (receiverId && receiverId !== senderId) {
+    const permission = await canSendPrivateMessage(senderId, receiverId);
+    if (!permission.ok) throw new DelayedPermissionError(permission.message || 'No permission to send this message');
+  }
+  if (groupId) {
+    const membership = await prisma.groupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: senderId } },
+    });
+    if (!membership) throw new DelayedPermissionError('You are not a member of this group');
+  }
+}
 
 export function startDelayedMessageScheduler() {
   if (schedulerStarted) return;
@@ -19,6 +36,7 @@ export function startDelayedMessageScheduler() {
 
       for (const delayed of dueMessages) {
         try {
+          await assertCanSend(delayed.senderId, delayed.receiverId, delayed.groupId);
           const msg = await prisma.message.create({
             data: {
               senderId: delayed.senderId,
@@ -47,6 +65,12 @@ export function startDelayedMessageScheduler() {
             }
           }
         } catch (e) {
+          if (e instanceof DelayedPermissionError) {
+            await prisma.delayedMessage.update({
+              where: { id: delayed.id },
+              data: { cancelled: true },
+            }).catch(() => {});
+          }
           console.error(`[定时消息处理失败] 消息ID: ${delayed.id}`, e);
         }
       }
@@ -69,6 +93,7 @@ export async function scheduleMessage(
   },
 ) {
   const sendAt = new Date(data.sendAt);
+  await assertCanSend(senderId, data.receiverId, data.groupId);
   if (isNaN(sendAt.getTime())) throw new Error('无效的时间格式');
   if (sendAt <= new Date()) throw new Error('发送时间必须在未来');
 

@@ -14,7 +14,7 @@ const FluidInput = forwardRef<HTMLTextAreaElement, FluidInputProps>(
 
     return (
       <div
-        className={`flex items-end w-full min-h-[48px] rounded-2xl border transition-all duration-300 ${
+        className={`flex min-w-0 items-end w-full min-h-[48px] rounded-2xl border transition-all duration-300 ${
           isFocused
             ? 'border-primary-300 bg-white shadow-sm dark:bg-zinc-800'
             : 'border-gray-200 bg-white/90 dark:border-zinc-700 dark:bg-zinc-800/70'
@@ -49,7 +49,7 @@ const FluidInput = forwardRef<HTMLTextAreaElement, FluidInputProps>(
           placeholder="输入消息..."
           onFocus={(e) => { setIsFocused(true); onFocus?.(e); }}
           onBlur={(e) => { setIsFocused(false); onBlur?.(e); }}
-          className="flex-1 bg-transparent border-none outline-none resize-none text-[15px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 px-2 py-3 leading-relaxed"
+          className="min-w-0 flex-1 bg-transparent border-none outline-none resize-none text-[15px] text-gray-800 dark:text-gray-100 placeholder:text-gray-400 px-2 py-3 leading-relaxed"
         />
       </div>
     );

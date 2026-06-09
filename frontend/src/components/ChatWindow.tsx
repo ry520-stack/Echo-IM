@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, Clock, Send, Smile, Trash2 } from 'lucide-react';
+import { Image, Clock, Send, Smile, Trash2, PawPrint, Camera, Cookie, Backpack, Store, Heart, Gift, Sparkles, ShowerHead, Dumbbell, Compass, Footprints, Brush, Shield, Music, BookOpen, Briefcase } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useToast } from '../contexts/ToastContext';
@@ -57,7 +57,6 @@ interface Peer {
   digitalId: number;
   lastSeenAt: string;
   status: string;
-  autoReply?: string;
   allowStrangerMessage?: boolean;
   readReceiptsEnabled?: boolean;
 }
@@ -70,7 +69,80 @@ interface Props {
   groupAvatar?: string;
   onBack?: () => void;
   initialOrbit?: boolean;
+  focusMessageId?: string;
 }
+
+interface PetBond {
+  id: string;
+  status: 'pending' | 'active' | 'rejected';
+  requestedBy: string;
+  pendingForMe: boolean;
+  name: string;
+  avatar: string;
+  level: number;
+  experience: number;
+  intimacy: number;
+  coins?: number;
+  biscuits?: number;
+  activity?: string;
+  activityUntil?: string | null;
+  education?: string;
+  job?: string;
+  todayMessageCount?: number;
+  todayMutual?: boolean;
+  streakDays?: number;
+  repairCards?: number;
+  repairableDay?: string | null;
+  mood?: 'happy' | 'sad' | 'sick';
+  dailyTasks?: Array<{ target: number; label: string; bonusExperience: number; completed: boolean }>;
+  achievementTasks?: Array<{ key: string; label: string; progress: number; target: number; unit: string; completed: boolean }>;
+}
+
+type PetAction =
+  | 'check-in'
+  | 'buy-biscuit'
+  | 'buy-snack-box'
+  | 'buy-repair-card'
+  | 'buy-study-kit'
+  | 'buy-date-pack'
+  | 'feed'
+  | 'study'
+  | 'work'
+  | 'sleep'
+  | 'cuddle'
+  | 'play'
+  | 'walk'
+  | 'clean'
+  | 'bath'
+  | 'train'
+  | 'explore'
+  | 'dance'
+  | 'guard';
+
+const PET_STAGES = [
+  { level: 10, name: '星辉伙伴', color: 'from-fuchsia-400 to-violet-500', glow: 'shadow-fuchsia-500/30' },
+  { level: 6, name: '活力伙伴', color: 'from-violet-400 to-indigo-500', glow: 'shadow-violet-500/25' },
+  { level: 3, name: '成长伙伴', color: 'from-amber-400 to-orange-500', glow: 'shadow-amber-500/25' },
+  { level: 1, name: '幼年伙伴', color: 'from-yellow-300 to-amber-400', glow: 'shadow-amber-500/20' },
+];
+const PET_EXP_PER_LEVEL = 120;
+
+const petStage = (level: number) => PET_STAGES.find(stage => level >= stage.level) || PET_STAGES[PET_STAGES.length - 1];
+
+const petStatusMark = (pet: PetBond, action: string) => {
+  if (action === 'sleep' || pet.activity === 'sleep') return 'Z';
+  if (pet.activity === 'study') return '书';
+  if (pet.activity === 'work') return '工';
+  if (pet.activity === 'walk') return '走';
+  if (pet.activity === 'bath' || pet.activity === 'clean') return '净';
+  if (pet.activity === 'train') return '训';
+  if (pet.activity === 'explore') return '探';
+  if (action === 'feed') return '饱';
+  if (action === 'laugh') return '乐';
+  if (pet.mood === 'sick') return '病';
+  if (pet.mood === 'sad') return '想';
+  return '伴';
+};
 
 const ERROR_MAP: Record<string, string> = {
   blocked: '对方已将你拉黑，或你已拉黑对方',
@@ -85,7 +157,7 @@ const accentRingClass: Record<string, string> = {
   black: 'ring-gray-900 dark:ring-gray-100',
 };
 
-export default function ChatWindow({ peerId, peer, chatType, groupName, groupAvatar, onBack, initialOrbit = false }: Props) {
+export default function ChatWindow({ peerId, peer, chatType, groupName, groupAvatar, onBack, initialOrbit = false, focusMessageId }: Props) {
   const { user } = useAuth();
   const { socket, connected, isUserOnline } = useSocket();
   const toast = useToast();
@@ -113,22 +185,171 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   const [bgUrlInput, setBgUrlInput] = useState('');
   const [emojis, setEmojis] = useState<{ id: string; imageUrl: string; name: string }[]>([]);
   const [emojiManageMode, setEmojiManageMode] = useState(false);
+  const [emojiReorderingId, setEmojiReorderingId] = useState<string | null>(null);
+  const [pet, setPet] = useState<PetBond | null>(null);
+  const [petOpen, setPetOpen] = useState(false);
+  const [petName, setPetName] = useState('');
+  const [petBusy, setPetBusy] = useState(false);
+  const [petAction, setPetAction] = useState<'idle' | 'poke' | 'feed' | 'laugh' | 'sleep'>('idle');
+  const [petSide, setPetSide] = useState<'left' | 'right'>('right');
+  const [petY, setPetY] = useState(104);
+  const [petTab, setPetTab] = useState<'home' | 'shop' | 'bag'>('home');
+  const petDraggingRef = useRef(false);
+  const petMovedRef = useRef(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!socket || isGroup) return;
+    const handleRelationshipUpdated = (data: { action?: string; peerId?: string }) => {
+      if (data.peerId !== realPeerId || !['blocked', 'removed'].includes(data.action || '')) return;
+      toast(data.action === 'blocked' ? '\u8be5\u79c1\u804a\u5df2\u56e0\u62c9\u9ed1\u5173\u7cfb\u5173\u95ed' : '\u4f60\u4eec\u5df2\u4e0d\u662f\u597d\u53cb', 'error');
+      onBack?.();
+    };
+    socket.on('relationship:updated', handleRelationshipUpdated);
+    return () => {
+      socket.off('relationship:updated', handleRelationshipUpdated);
+    };
+  }, [isGroup, onBack, realPeerId, socket, toast]);
+
+  const fetchPet = useCallback(async () => {
+    if (isGroup || !realPeerId) {
+      setPet(null);
+      return;
+    }
+    try {
+      const next = await api<PetBond | null>('GET', `/api/pets/${realPeerId}`);
+      setPet(next);
+      setPetName(next?.name || '');
+    } catch {
+      setPet(null);
+    }
+  }, [isGroup, realPeerId]);
+
+  useEffect(() => { fetchPet(); }, [fetchPet]);
+  useEffect(() => {
+    if (!socket || isGroup) return;
+    const refreshPet = (data: { peerId?: string }) => {
+      if (data.peerId === realPeerId) fetchPet();
+    };
+    const animatePet = (data: { peerId?: string; action?: 'poke' | 'feed' | 'laugh' | 'sleep' }) => {
+      if (data.peerId !== realPeerId || !data.action) return;
+      setPetAction(data.action);
+      window.setTimeout(() => setPetAction('idle'), data.action === 'sleep' ? 5000 : 1800);
+    };
+    socket.on('pet:updated', refreshPet);
+    socket.on('pet:interaction', animatePet);
+    return () => {
+      socket.off('pet:updated', refreshPet);
+      socket.off('pet:interaction', animatePet);
+    };
+  }, [fetchPet, isGroup, realPeerId, socket]);
+
+  const interactWithPet = (action: 'poke' | 'feed') => {
+    if (!socket || !pet || pet.status !== 'active') return;
+    socket.emit('pet:interact', { peerId: realPeerId, action });
+  };
+
+  const repairPetStreak = async () => {
+    setPetBusy(true);
+    try {
+      const next = await api<PetBond>('POST', `/api/pets/${realPeerId}/repair`);
+      setPet(next);
+      toast('补签成功，连续互动已恢复', 'success');
+    } catch (e: any) {
+      toast(e.message || '补签失败', 'error');
+    } finally {
+      setPetBusy(false);
+    }
+  };
+
+  const rejectPet = async () => {
+    setPetBusy(true);
+    try {
+      await api('POST', `/api/pets/${realPeerId}/reject`);
+      await fetchPet();
+      toast('已拒绝共同领养邀请', 'success');
+    } catch (e: any) {
+      toast(e.message || '操作失败', 'error');
+    } finally {
+      setPetBusy(false);
+    }
+  };
+
+  const runPetAction = async (action: PetAction) => {
+    setPetBusy(true);
+    try {
+      const next = await api<PetBond>('POST', `/api/pets/${realPeerId}/action`, { action });
+      setPet(next);
+      if (action === 'feed') interactWithPet('feed');
+      if (action === 'sleep') setPetAction('sleep');
+      toast(action === 'check-in' ? '签到成功，金币 +8' : action === 'buy-biscuit' ? '饼干已放入背包' : '宠物状态已更新', 'success');
+    } catch (e: any) {
+      toast(e.message || '操作失败', 'error');
+    } finally {
+      setPetBusy(false);
+    }
+  };
+
+  const adoptPet = async () => {
+    setPetBusy(true);
+    try {
+      const next = await api<PetBond>('POST', `/api/pets/${realPeerId}/adopt`);
+      setPet(next);
+      setPetName(next.name);
+      toast(next.status === 'active' ? '\u5171\u540c\u5ba0\u7269\u5df2\u9886\u517b' : '\u9886\u517b\u9080\u8bf7\u5df2\u53d1\u9001', 'success');
+    } catch (e: any) {
+      toast(e.message || '\u64cd\u4f5c\u5931\u8d25', 'error');
+    } finally {
+      setPetBusy(false);
+    }
+  };
+
+  const savePet = async (avatar?: string) => {
+    if (!pet || pet.status !== 'active') return;
+    setPetBusy(true);
+    try {
+      const next = await api<PetBond>('PATCH', `/api/pets/${realPeerId}`, { name: petName.trim() || pet.name, ...(avatar !== undefined ? { avatar } : {}) });
+      setPet(next);
+      setPetName(next.name);
+      toast('\u5ba0\u7269\u8d44\u6599\u5df2\u66f4\u65b0', 'success');
+    } catch (e: any) {
+      toast(e.message || '\u4fdd\u5b58\u5931\u8d25', 'error');
+    } finally {
+      setPetBusy(false);
+    }
+  };
+
+  const uploadPetAvatar = async (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const token = localStorage.getItem('echo-token');
+    const res = await fetch(`${getServerUrl()}/api/upload/chat-image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '\u4e0a\u4f20\u5931\u8d25');
+    await savePet(data.url);
+  };
+
   const [emojiExpanded, setEmojiExpanded] = useState(false);
   const [emojiPage, setEmojiPage] = useState(0);
+  const [emojiPageDirection, setEmojiPageDirection] = useState(0);
   const [emojiDragX, setEmojiDragX] = useState(0);
   const [emojiDragging, setEmojiDragging] = useState(false);
   const [emojiManageFlash, setEmojiManageFlash] = useState(false);
   const emojiDragIdRef = useRef<string | null>(null);
   const emojiMovedRef = useRef(false);
+  const emojiLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emojiPointerStartRef = useRef({ x: 0, y: 0 });
+  const emojisRef = useRef<{ id: string; imageUrl: string; name: string }[]>([]);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [selectedEmojis, setSelectedEmojis] = useState<Set<string>>(new Set());
   const emojisCachedRef = useRef(false);
-  const [showPersonalOrbit, setShowPersonalOrbit] = useState(false);
+  const [showPersonalOrbit, setShowPersonalOrbit] = useState(() => !!initialOrbit && chatType !== 'group' && !!peer);
   const [showGroupOrbit, setShowGroupOrbit] = useState(false);
   const [inkDrops, setInkDrops] = useState<{ id: number; x: number }[]>([]);
   const dropCounter = useRef(0);
   const [msgContextMenu, setMsgContextMenu] = useState<{ msgId: string; x: number; y: number; isMine: boolean; createdAt: string; type?: string; content?: string } | null>(null);
   const msgLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mentionLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCollapseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emojiSwipeRef = useRef({ sx: 0, sy: 0, active: false });
 
@@ -155,7 +376,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     if (!force && emojisCachedRef.current && emojis.length > 0) return;
     try {
       const items = await api<any[]>('GET', '/api/emojis');
-      setEmojis(applyEmojiOrder(items));
+      setEmojis(items);
       emojisCachedRef.current = true;
     } catch { /* */ }
   };
@@ -200,10 +421,15 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
+      emojisRef.current = next;
       localStorage.setItem('echo-emoji-order', JSON.stringify(next.map(e => e.id)));
       return next;
     });
   };
+
+  useEffect(() => {
+    emojisRef.current = emojis;
+  }, [emojis]);
 
   useEffect(() => {
     setEmojiPage(page => Math.min(page, emojiMaxPage));
@@ -234,6 +460,14 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   const [emojiPreview, setEmojiPreview] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [groupAliases, setGroupAliases] = useState<Record<string, string>>({});
+  const [liveGroupName, setLiveGroupName] = useState(groupName || '');
+  const [liveGroupAvatar, setLiveGroupAvatar] = useState(groupAvatar || '');
+  const [groupMemberCount, setGroupMemberCount] = useState(0);
+
+  useEffect(() => {
+    setLiveGroupName(groupName || '');
+    setLiveGroupAvatar(groupAvatar || '');
+  }, [groupAvatar, groupName]);
 
   const readReceiptKey = `echo-read-${peerId}`;
   const [readReceiptOn, setReadReceiptOn] = useState(() => {
@@ -256,14 +490,31 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       setGroupAliases({});
       return;
     }
-    api<any>('GET', `/api/groups/${peerId}`).then(group => {
+    const refreshGroupAliases = () => api<any>('GET', `/api/groups/${peerId}`).then(group => {
       const aliases: Record<string, string> = {};
       (group.members || []).forEach((member: any) => {
         aliases[member.userId] = member.alias || member.user?.nickname || member.user?.username || '';
       });
       setGroupAliases(aliases);
+      setLiveGroupName(group.name || '');
+      setLiveGroupAvatar(group.avatar || '');
+      setGroupMemberCount(group.memberCount || group.members?.length || 0);
     }).catch(() => setGroupAliases({}));
-  }, [isGroup, peerId]);
+    const handleGroupUpdated = (data: { groupId?: string; action?: string }) => {
+      if (data.groupId !== peerId) return;
+      if (data.action === 'dismissed' || data.action === 'access-revoked') {
+        toast('\u4f60\u5df2\u4e0d\u5728\u8be5\u7fa4\u804a\u4e2d', 'error');
+        onBack?.();
+        return;
+      }
+      refreshGroupAliases();
+    };
+    refreshGroupAliases();
+    socket?.on('group:updated', handleGroupUpdated);
+    return () => {
+      socket?.off('group:updated', handleGroupUpdated);
+    };
+  }, [isGroup, onBack, peerId, socket, toast]);
 
   useEffect(() => {
     if (chatType !== 'group' && peerId) {
@@ -559,9 +810,11 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
 
   const fetchMessages = useCallback(async (before?: string) => {
     try {
-      const endpoint = isGroup
-        ? `/api/messages/group?groupId=${peerId}${before ? `&before=${before}` : ''}`
-        : `/api/messages?userId=${peerId}${before ? `&before=${before}` : ''}`;
+      const endpoint = !before && focusMessageId
+        ? `/api/messages/context/${focusMessageId}`
+        : isGroup
+          ? `/api/messages/group?groupId=${peerId}${before ? `&before=${before}` : ''}`
+          : `/api/messages?userId=${peerId}${before ? `&before=${before}` : ''}`;
       const data = await api<Message[]>('GET', endpoint);
       if (before) {
         setMessages(prev => {
@@ -574,7 +827,13 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
         setOlder(data.length >= 50);
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
-            bottomRef.current?.scrollIntoView();
+            if (focusMessageId) {
+              document.getElementById(`message-${focusMessageId}`)?.scrollIntoView({ block: 'center' });
+              setHighlightedMessageId(focusMessageId);
+              window.setTimeout(() => setHighlightedMessageId(null), 1800);
+            } else {
+              bottomRef.current?.scrollIntoView();
+            }
           });
         });
       }
@@ -582,7 +841,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       setLoading(false);
       readyRef.current = true;
     }
-  }, [peerId, isGroup]);
+  }, [peerId, isGroup, focusMessageId]);
 
   useEffect(() => {
     setMessages([]);
@@ -732,7 +991,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     };
   }, [socket, peerId, user?.id, isGroup]);
 
-  const sendMessage = (e?: React.FormEvent) => {
+  const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     const content = input.trim();
     if (!content || !socket) return;
@@ -801,7 +1060,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   };
 
   const getPeerName = () => {
-    if (isGroup) return groupName || '群聊';
+    if (isGroup) return liveGroupName || '群聊';
     if (!peer) return '';
     return peer.nickname || peer.username;
   };
@@ -929,6 +1188,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       if (msgLongPressRef.current) clearTimeout(msgLongPressRef.current);
+      if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
       if (autoCollapseRef.current) clearTimeout(autoCollapseRef.current);
       if (recorderActive) {
         stopRecord().catch(() => {});
@@ -990,7 +1250,20 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   };
 
   // Swipe gestures (mobile) — must be before early return (Hook rules)
-  const chatSwipeRef = useRef({ sx: 0, sy: 0 });
+  const chatSwipeRef = useRef({ sx: 0, sy: 0, active: false });
+  const chatGestureLocked = !!(
+    activePanel
+    || recording
+    || petOpen
+    || clearConfirmOpen
+    || showBgPicker
+    || emojiPreview
+    || msgContextMenu
+    || showPersonalOrbit
+    || showGroupOrbit
+    || showShootMenu
+    || petDraggingRef.current
+  );
 
   if (!peerId) {
     return (
@@ -1000,10 +1273,15 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     );
   }
   const handleChatTouchStart = (e: React.TouchEvent) => {
-    chatSwipeRef.current = { sx: e.touches[0].clientX, sy: e.touches[0].clientY };
+    if (chatGestureLocked || (e.target as HTMLElement).closest('[data-chat-gesture-lock]')) {
+      chatSwipeRef.current.active = false;
+      return;
+    }
+    chatSwipeRef.current = { sx: e.touches[0].clientX, sy: e.touches[0].clientY, active: true };
   };
   const handleChatTouchEnd = (e: React.TouchEvent) => {
-    if (activePanel || recording) return;
+    if (!chatSwipeRef.current.active || chatGestureLocked) return;
+    chatSwipeRef.current.active = false;
     const dx = e.changedTouches[0].clientX - chatSwipeRef.current.sx;
     const dy = Math.abs(e.changedTouches[0].clientY - chatSwipeRef.current.sy);
     if (Math.abs(dx) < 50 || Math.abs(dx) < dy) return;
@@ -1033,7 +1311,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     if (Math.abs(dx) < dy) return;
     const atStart = emojiPage === 0 && dx > 0;
     const atEnd = emojiPage === emojiMaxPage && dx < 0;
-    setEmojiDragX((atStart || atEnd) ? dx * 0.32 : dx);
+    e.preventDefault();
+    setEmojiDragX((atStart || atEnd) ? dx * 0.18 : dx * 0.68);
   };
 
   const handleEmojiTouchEnd = (e: React.TouchEvent) => {
@@ -1044,8 +1323,10 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     emojiSwipeRef.current.active = false;
     setEmojiDragging(false);
     setEmojiDragX(0);
-    if (Math.abs(dx) < 48 || Math.abs(dx) < dy) return;
-    setEmojiPage(page => Math.max(0, Math.min(emojiMaxPage, page + (dx < 0 ? 1 : -1))));
+    if (Math.abs(dx) < 68 || Math.abs(dx) < dy) return;
+    const direction = dx < 0 ? 1 : -1;
+    setEmojiPageDirection(direction);
+    setEmojiPage(page => Math.max(0, Math.min(emojiMaxPage, page + direction)));
   };
 
   const toggleEmojiSelected = (id: string) => {
@@ -1141,6 +1422,45 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       onTouchEnd={handleChatTouchEnd}
       onContextMenu={(e) => e.preventDefault()}>
       {shootMenu}
+      {!isGroup && pet?.status === 'active' && (
+        <motion.div
+          drag
+          dragMomentum={false}
+          dragElastic={0.05}
+          dragSnapToOrigin
+          data-chat-gesture-lock
+          onTouchStart={(e) => { e.stopPropagation(); petDraggingRef.current = true; }}
+          onTouchEnd={(e) => { e.stopPropagation(); petDraggingRef.current = false; }}
+          onDragStart={() => { petMovedRef.current = true; }}
+          whileDrag={{ scale: 1.08 }}
+          onDragEnd={(_, info) => {
+            setPetSide(info.point.x < window.innerWidth / 2 ? 'left' : 'right');
+            setPetY(Math.max(72, Math.min(window.innerHeight - 230, info.point.y - 40)));
+            window.setTimeout(() => { petMovedRef.current = false; }, 120);
+          }}
+          animate={{
+            top: petY,
+            left: petSide === 'left' ? 10 : 'auto',
+            right: petSide === 'right' ? 10 : 'auto',
+            y: petAction === 'laugh' ? [0, -14, 0, -10, 0] : petAction === 'poke' ? [0, -10, 2, -5, 0] : petAction === 'feed' ? [0, -6, 0] : [0, -3, 0],
+            rotate: petAction === 'laugh' ? [0, -8, 8, -5, 0] : petAction === 'poke' ? [0, -10, 8, 0] : [0, 2, -2, 0],
+          }}
+          transition={{ type: 'spring', stiffness: 230, damping: 18 }}
+          className="absolute z-30 flex w-20 touch-none select-none flex-col items-center"
+        >
+          <button
+            type="button"
+            onClick={() => { if (!petDraggingRef.current && !petMovedRef.current) { setPetTab('home'); setPetOpen(true); } }}
+            className={`relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-gradient-to-br ${petStage(pet.level).color} text-xl font-bold text-white shadow-xl ${petStage(pet.level).glow}`}
+            title="戳一戳宠物"
+          >
+            {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" /> : <PawPrint size={26} />}
+            <span className="absolute bottom-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-white/95 px-1 text-[10px] font-bold text-amber-600 shadow">
+              {petStatusMark(pet, petAction)}
+            </span>
+          </button>
+        </motion.div>
+      )}
       {/* Chat background layer with GPU acceleration */}
       {effectiveBg && (
         <div
@@ -1156,24 +1476,31 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
             ←
           </button>
         )}
-        <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold text-white shrink-0 ${
+        <button type="button" onClick={() => isGroup && setShowGroupOrbit(true)} className={`flex h-9 w-9 items-center justify-center rounded-xl text-base font-bold text-white shrink-0 ${
           isGroup ? 'bg-emerald-500' : 'bg-primary-500'
         }`}>
-          {isGroup ? (groupAvatar ? <img src={assetUrl(groupAvatar)} alt="" className="h-full w-full rounded-xl object-cover" /> : (groupName?.[0]?.toUpperCase() || 'G')) : (
+          {isGroup ? (liveGroupAvatar ? <img src={assetUrl(liveGroupAvatar)} alt="" className="h-full w-full rounded-xl object-cover" /> : (liveGroupName?.[0]?.toUpperCase() || 'G')) : (
             peer?.avatar ? <img src={assetUrl(peer.avatar)} alt="" className="h-full w-full rounded-xl object-cover" /> :
             getPeerName()[0]?.toUpperCase() || '?'
           )}
-        </div>
-        <div className="flex-1 min-w-0">
+        </button>
+        <button type="button" onClick={() => isGroup && setShowGroupOrbit(true)} className="flex-1 min-w-0 text-left">
           <h2 className="text-lg font-semibold leading-tight text-gray-900 dark:text-gray-100 truncate">{getPeerName()}</h2>
           <p className="text-sm text-gray-500">
-            {typingUser ? <span className="text-primary-500">正在输入...</span> :
+            {isGroup ? `${groupMemberCount} 人 · 查看群资料` :
+             typingUser ? <span className="text-primary-500">正在输入...</span> :
              isUserOnline(peerId) ? <span className="text-green-500">在线</span> : '离线'}
-            {!isGroup && peer?.autoReply && <span className="ml-2 text-amber-500">[自动回复中]</span>}
           </p>
-        </div>
+        </button>
+        {!isGroup && pet?.status !== 'active' && (
+          <button onClick={() => setPetOpen(true)}
+            className="shrink-0 rounded-lg p-1.5 text-amber-500 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20"
+            title={'\u5171\u540c\u5ba0\u7269'}>
+            {pet?.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-[18px] w-[18px] rounded-md object-cover" /> : <PawPrint size={18} />}
+          </button>
+        )}
         {!isGroup && (
-          <button onClick={() => startCall(peerId)}
+          <button onClick={() => startCall(peerId, { name: peer?.nickname || peer?.username || '对方', avatar: peer?.avatar || '' })}
             className="shrink-0 rounded-lg p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="语音通话">
             <Phone size={18} />
@@ -1220,11 +1547,41 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
 
               if (msg.type === 'pet') {
                 return (
-                  <div key={msg.id} className="flex justify-center px-4 py-1">
-                    <div className="max-w-[82%] rounded-2xl border border-amber-100 bg-amber-50/95 px-3 py-2 text-xs text-amber-800 shadow-sm shadow-amber-900/5 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
-                      <span className="mr-1 font-semibold">Echo Pet</span>
-                      <span>{msg.content}</span>
+                  <div key={msg.id} className="flex items-end gap-1.5 ml-1 msg-in">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-amber-100 text-sm font-bold text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+                      {pet?.avatar
+                        ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" />
+                        : (pet?.name || 'Echo Pet')[0]?.toUpperCase()}
                     </div>
+                    <div className="min-w-0 max-w-[80%]">
+                      <p className="mb-0.5 ml-1 text-[10px] text-amber-500">{pet?.name || 'Echo Pet'}</p>
+                      <div className="rounded-2xl rounded-bl-md bg-white/95 px-3.5 py-2 text-sm text-gray-800 shadow-sm ring-1 ring-black/[0.03] dark:bg-gray-800/95 dark:text-gray-200 dark:ring-white/[0.04]">
+                        {msg.content}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (msg.type === 'pet-adopt') {
+                let event = 'requested';
+                try { event = JSON.parse(msg.content).event || event; } catch { /* historical fallback */ }
+                const pendingForMe = event === 'requested' && msg.senderId !== user?.id && pet?.status === 'pending' && pet.pendingForMe;
+                const text = event === 'adopted'
+                  ? '共同宠物已经领养成功'
+                  : event === 'rejected'
+                    ? '共同领养邀请已被拒绝'
+                    : msg.senderId === user?.id ? '你发起了共同领养邀请' : '对方申请共同领养宠物';
+                return (
+                  <div key={msg.id} className="mx-auto my-2 w-[92%] rounded-2xl border border-amber-200 bg-amber-50/95 p-3 text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+                    <p className="text-xs font-semibold">共同宠物</p>
+                    <p className="mt-1 text-sm">{text}</p>
+                    {pendingForMe && (
+                      <div className="mt-3 flex gap-2">
+                        <button disabled={petBusy} onClick={adoptPet} className="rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">允许</button>
+                        <button disabled={petBusy} onClick={rejectPet} className="rounded-xl bg-white px-3 py-1.5 text-xs font-semibold text-gray-500 disabled:opacity-50 dark:bg-gray-900 dark:text-gray-300">拒绝</button>
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -1232,7 +1589,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
               return (
                 <div
                   key={msg.id}
-                  className={`flex flex-col msg-in ${isMine ? 'items-end mr-1' : 'items-start ml-1'}`}
+                  id={`message-${msg.id}`}
+                  className={`flex flex-col rounded-2xl transition-colors duration-700 msg-in ${highlightedMessageId === msg.id ? 'bg-yellow-200/70 py-1 ring-2 ring-yellow-300 dark:bg-yellow-700/30 dark:ring-yellow-600' : ''} ${isMine ? 'items-end mr-1' : 'items-start ml-1'}`}
                 >
                   {msg.replyTo && !msg.isRecalled && (
                     <div className={`mb-1 max-w-[75%] rounded-lg bg-gray-200/60 px-3 py-1.5 text-xs text-gray-500 dark:bg-gray-800 ${isMine ? 'text-right' : ''}`}>
@@ -1251,7 +1609,23 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                     )}
 
                     {!isMine && !msg.isRecalled && (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-100 text-sm font-bold text-primary-500 dark:bg-primary-900/30">
+                      <div
+                        data-chat-gesture-lock
+                        onTouchStart={(e) => {
+                          if (!isGroup) return;
+                          e.stopPropagation();
+                          mentionLongPressRef.current = setTimeout(() => {
+                            const name = getSenderDisplayName(msg);
+                            setInput(prev => `${prev}${prev && !prev.endsWith(' ') ? ' ' : ''}@${name} `);
+                            inputRef.current?.focus();
+                            navigator.vibrate?.(20);
+                          }, 500);
+                        }}
+                        onTouchEnd={(e) => { e.stopPropagation(); if (mentionLongPressRef.current) clearTimeout(mentionLongPressRef.current); mentionLongPressRef.current = null; }}
+                        onTouchMove={() => { if (mentionLongPressRef.current) clearTimeout(mentionLongPressRef.current); mentionLongPressRef.current = null; }}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary-100 text-sm font-bold text-primary-500 dark:bg-primary-900/30"
+                        title={isGroup ? '长按艾特' : undefined}
+                      >
                         {getSenderAvatar(msg)
                           ? <img src={assetUrl(getSenderAvatar(msg)!)} alt="" className="h-full w-full object-cover" />
                           : getSenderDisplayName(msg)[0]?.toUpperCase() || '?'}
@@ -1401,7 +1775,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
 
       {activePanel === 'schedule' && (
         <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
-          <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2">
             <span className="text-xs text-gray-500">定时发送:</span>
             <input
               type="datetime-local"
@@ -1458,7 +1832,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   if (next) {
                     setEmojiExpanded(true);
                     setEmojiManageFlash(true);
-                    window.setTimeout(() => setEmojiManageFlash(false), 2000);
+                    window.setTimeout(() => setEmojiManageFlash(false), 1500);
                   }
                   setSelectedEmojis(new Set());
                 }}
@@ -1506,7 +1880,15 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
             <span className="text-xs text-gray-400">上传表情包图片...</span>
           ) : (
             <div className={emojiManageMode && emojiExpanded ? 'flex-1 overflow-y-auto overflow-x-hidden' : 'flex-1 overflow-hidden'}>
-              <div
+              <AnimatePresence initial={false} mode="popLayout">
+              <motion.div
+                key={emojiManageMode && emojiExpanded ? 'manage' : `page-${emojiPage}`}
+                initial={{ x: emojiPageDirection * 72, opacity: 0.72 }}
+                animate={{ x: emojiDragging ? emojiDragX : 0, opacity: 1 }}
+                exit={{ x: emojiPageDirection * -72, opacity: 0.72 }}
+                transition={emojiDragging
+                  ? { duration: 0 }
+                  : { type: 'spring', stiffness: 190, damping: 24, mass: 0.9 }}
                 className="grid h-full grid-cols-4 gap-2 overflow-y-auto px-0.5 pb-2"
                 style={{ gridTemplateRows: emojiExpanded ? 'repeat(auto-fill, minmax(64px, 1fr))' : '1fr' }}
               >
@@ -1523,12 +1905,32 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                         onDragStart={(e) => e.preventDefault()}
                         onPointerDown={(e) => {
                           if (!emojiManageMode || !emojiExpanded) return;
-                          emojiDragIdRef.current = emoji.id;
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const target = e.currentTarget;
+                          const pointerId = e.pointerId;
+                          try { target.setPointerCapture?.(pointerId); } catch {}
+                          emojiPointerStartRef.current = { x: e.clientX, y: e.clientY };
                           emojiMovedRef.current = false;
-                          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                          if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                          emojiLongPressRef.current = setTimeout(() => {
+                            emojiDragIdRef.current = emoji.id;
+                            setEmojiReorderingId(emoji.id);
+                            navigator.vibrate?.(20);
+                          }, 450);
                         }}
                         onPointerMove={(e) => {
-                          if (!emojiManageMode || !emojiExpanded || !emojiDragIdRef.current) return;
+                          if (!emojiManageMode || !emojiExpanded) return;
+                          e.stopPropagation();
+                          if (!emojiDragIdRef.current) {
+                            const dx = Math.abs(e.clientX - emojiPointerStartRef.current.x);
+                            const dy = Math.abs(e.clientY - emojiPointerStartRef.current.y);
+                            if ((dx > 8 || dy > 8) && emojiLongPressRef.current) {
+                              clearTimeout(emojiLongPressRef.current);
+                              emojiLongPressRef.current = null;
+                            }
+                            return;
+                          }
                           e.preventDefault();
                           const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-emoji-id]') as HTMLElement | null;
                           const toId = target?.dataset.emojiId;
@@ -1539,13 +1941,25 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                         }}
                         onPointerUp={(e) => {
                           if (emojiManageMode && emojiExpanded) {
+                            e.stopPropagation();
+                            if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                            emojiLongPressRef.current = null;
                             try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch {}
-                            if (!emojiMovedRef.current && emojiDragIdRef.current === emoji.id) toggleEmojiSelected(emoji.id);
+                            if (!emojiMovedRef.current) toggleEmojiSelected(emoji.id);
+                            if (emojiMovedRef.current) api('PUT', '/api/emojis/order', { ids: emojisRef.current.map(item => item.id) }).catch(() => {});
                             emojiDragIdRef.current = null;
                             emojiMovedRef.current = false;
+                            setEmojiReorderingId(null);
                           }
                         }}
-                        className={(emojiManageMode && selected ? `ring-1 ${selectedRing} ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + 'h-16 w-16 min-w-[64px] min-h-[64px] cursor-pointer rounded-xl object-cover transition-all hover:opacity-80'}
+                        onPointerCancel={() => {
+                          if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                          emojiLongPressRef.current = null;
+                          emojiDragIdRef.current = null;
+                          emojiMovedRef.current = false;
+                          setEmojiReorderingId(null);
+                        }}
+                        className={(emojiManageMode && selected ? `ring-1 ${selectedRing} ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiManageMode && emojiExpanded ? 'touch-none select-none ' : '') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-16 w-16 min-w-[64px] min-h-[64px] cursor-pointer rounded-xl object-contain transition-all hover:opacity-80'}
                         onClick={() => {
                           if (emojiManageMode && emojiExpanded) return;
                           sendEmojiImage(emoji);
@@ -1554,7 +1968,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                     </div>
                   );
                 })}
-              </div>
+              </motion.div>
+              </AnimatePresence>
             </div>
           )}
         </div>
@@ -1563,7 +1978,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       <motion.form layout onSubmit={sendMessage} transition={{ type: 'spring', stiffness: 200, damping: 25 }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
-        className="relative flex items-end gap-2 border-t border-gray-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-900/90 group/input"
+        className="relative flex w-full min-w-0 items-end gap-2 border-t border-gray-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.04)] backdrop-blur-xl dark:border-zinc-800/70 dark:bg-zinc-900/90 group/input"
         style={{ minHeight: '62px', paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom, 0px))' }}>
         {/* Toggle button */}
         <button
@@ -1633,7 +2048,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
         </AnimatePresence>
 
         {/* 二合一流体输入框（光球 + 麦克风） */}
-        <div className="relative flex-1 flex items-center">
+        <div className="relative flex min-w-0 flex-1 items-center">
           <FluidInput
             ref={inputRef as any}
             value={input}
@@ -1732,6 +2147,213 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       })()}
 
       {/* Image preview modal */}
+      <Modal open={petOpen} onClose={() => setPetOpen(false)} title={'\u5171\u540c\u5ba0\u7269'}>
+        {!pet ? (
+          <div className="space-y-3">
+            <p>{'\u4f60\u4eec\u8fd8\u6ca1\u6709\u5171\u540c\u5ba0\u7269\u3002\u53d1\u8d77\u9080\u8bf7\u540e\uff0c\u9700\u8981\u5bf9\u65b9\u786e\u8ba4\u624d\u4f1a\u6b63\u5f0f\u9886\u517b\u3002'}</p>
+            <button disabled={petBusy} onClick={adoptPet} className="w-full rounded-xl bg-amber-500 py-2 text-sm font-semibold text-white disabled:opacity-50">{'\u53d1\u8d77\u9886\u517b\u9080\u8bf7'}</button>
+          </div>
+        ) : pet.status === 'pending' ? (
+          <div className="space-y-3">
+            <p>{pet.pendingForMe ? '\u5bf9\u65b9\u9080\u8bf7\u4f60\u4e00\u8d77\u9886\u517b\u5ba0\u7269\u3002' : '\u9886\u517b\u9080\u8bf7\u5df2\u53d1\u9001\uff0c\u7b49\u5f85\u5bf9\u65b9\u786e\u8ba4\u3002'}</p>
+            {pet.pendingForMe && <div className="flex gap-2"><button disabled={petBusy} onClick={adoptPet} className="flex-1 rounded-xl bg-amber-500 py-2 text-sm font-semibold text-white disabled:opacity-50">允许</button><button disabled={petBusy} onClick={rejectPet} className="flex-1 rounded-xl bg-gray-100 py-2 text-sm font-semibold text-gray-500 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300">拒绝</button></div>}
+          </div>
+        ) : pet.status === 'rejected' ? (
+          <div className="space-y-3">
+            <p>上一次共同领养邀请已被拒绝。你可以重新发起邀请。</p>
+            <button disabled={petBusy} onClick={adoptPet} className="w-full rounded-xl bg-amber-500 py-2 text-sm font-semibold text-white disabled:opacity-50">重新发起邀请</button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ['home', Heart, '陪伴'],
+                ['shop', Store, '宠物商店'],
+                ['bag', Backpack, '背包'],
+              ] as const).map(([tab, Icon, label]) => (
+                <button key={tab} type="button" onClick={() => setPetTab(tab)} className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] ${petTab === tab ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-gray-50 text-gray-400 dark:bg-gray-800'}`}>
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
+            </div>
+            {petTab === 'shop' ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">宠物商店将用于限时皮肤和互动道具。当前先开放体验道具。</p>
+                <div className="flex items-center justify-between rounded-xl bg-amber-50 p-3 dark:bg-amber-950/20">
+                  <div><p className="font-semibold text-amber-700 dark:text-amber-300">饼干试吃装</p><p className="text-[11px] text-amber-500">免费体验 · 触发双方同步动画</p></div>
+                  <button disabled={petBusy} type="button" onClick={() => runPetAction('buy-biscuit')} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">5 金币购买</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['buy-snack-box', Gift, '零食盒', '3 个饼干 · +2 经验', '12 金币'],
+                    ['buy-study-kit', Sparkles, '学习套装', '+10 经验', '16 金币'],
+                    ['buy-date-pack', Heart, '陪伴礼包', '+4 亲密 · +4 经验', '18 金币'],
+                    ['buy-repair-card', Backpack, '补签卡', '恢复中断互动', '30 金币'],
+                  ] as const).map(([action, Icon, title, desc, price]) => (
+                    <button key={action} disabled={petBusy} type="button" onClick={() => runPetAction(action)} className="rounded-xl bg-white p-3 text-left shadow-sm ring-1 ring-gray-100 disabled:opacity-50 dark:bg-gray-900 dark:ring-gray-800">
+                      <span className="flex items-center gap-2 text-xs font-semibold text-gray-800 dark:text-gray-100"><Icon size={15} /> {title}</span>
+                      <span className="mt-1 block text-[11px] text-gray-400">{desc}</span>
+                      <span className="mt-2 inline-flex rounded-full bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-600 dark:bg-amber-950/30">{price}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-gray-100 dark:bg-gray-900 dark:ring-gray-800">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-bold text-gray-900 dark:text-gray-100">宠物服务</p>
+                    <span className="text-[11px] text-gray-400">消耗体力，提升状态</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      ['feed', Cookie, '喂食'],
+                      ['cuddle', Heart, '抱抱'],
+                      ['play', Sparkles, '玩耍'],
+                      ['walk', Footprints, '散步'],
+                      ['clean', Brush, '清洁'],
+                      ['bath', ShowerHead, '洗澡'],
+                      ['train', Dumbbell, '训练'],
+                      ['explore', Compass, '探险'],
+                      ['dance', Music, '跳舞'],
+                      ['guard', Shield, '守护'],
+                      ['study', BookOpen, '上学'],
+                      ['work', Briefcase, '打工'],
+                    ] as const).map(([action, Icon, label]) => (
+                      <button
+                        key={action}
+                        disabled={petBusy || (action === 'feed' && !pet.biscuits)}
+                        type="button"
+                        onClick={() => runPetAction(action)}
+                        className="flex flex-col items-center gap-1 rounded-xl bg-gray-50 px-2 py-2 text-[11px] font-semibold text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200"
+                      >
+                        <Icon size={15} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : petTab === 'bag' ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">体验道具会触发双方同步互动。后续可继续扩展共享库存。</p>
+                <button type="button" disabled={petBusy || !pet.biscuits} onClick={() => runPetAction('feed')} className="flex w-full items-center justify-between rounded-xl bg-amber-50 p-3 text-left disabled:opacity-50 dark:bg-amber-950/20">
+                  <span className="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-300"><Cookie size={16} /> 饼干</span>
+                  <span className="text-xs text-amber-500">{`${pet.biscuits || 0} 个 · 喂给宠物`}</span>
+                </button>
+                <button type="button" onClick={() => interactWithPet('poke')} className="flex w-full items-center justify-between rounded-xl bg-violet-50 p-3 text-left dark:bg-violet-950/20">
+                  <span className="font-semibold text-violet-700 dark:text-violet-300">互动玩具</span>
+                  <span className="text-xs text-violet-500">戳一戳</span>
+                </button>
+              </div>
+            ) : (
+              <>
+            <div className="flex items-center gap-3">
+              <label className={`flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${petStage(pet.level).color} text-white shadow-lg ${petStage(pet.level).glow}`}>
+                {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" /> : <Camera size={20} />}
+                <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPetAvatar(e.target.files[0]).catch(err => toast(err.message, 'error'))} />
+              </label>
+              <div className="min-w-0 flex-1">
+                <input value={petName} onChange={e => setPetName(e.target.value)} maxLength={20} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800" />
+                <p className="mt-1 text-xs text-gray-400">{`${petStage(pet.level).name} \u00b7 \u7b49\u7ea7 ${pet.level} \u00b7 \u4eb2\u5bc6\u5ea6 ${pet.intimacy}`}</p>
+              </div>
+              <button disabled={petBusy} onClick={() => savePet()} className="rounded-xl bg-gray-100 px-3 py-2 text-xs dark:bg-gray-800">{'\u4fdd\u5b58'}</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/20"><p className="text-[11px] text-amber-500">金币</p><p className="mt-1 font-bold text-amber-700 dark:text-amber-300">{pet.coins || 0}</p></div>
+              <div className="rounded-xl bg-violet-50 p-3 dark:bg-violet-950/20"><p className="text-[11px] text-violet-500">学历</p><p className="mt-1 truncate font-bold text-violet-700 dark:text-violet-300">{pet.education || '幼儿园'}</p></div>
+              <div className="rounded-xl bg-sky-50 p-3 dark:bg-sky-950/20"><p className="text-[11px] text-sky-500">职业</p><p className="mt-1 truncate font-bold text-sky-700 dark:text-sky-300">{pet.job || '还没有工作'}</p></div>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <button disabled={petBusy} onClick={() => runPetAction('check-in')} className="rounded-xl bg-amber-500 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50">签到</button>
+              <button disabled={petBusy} onClick={() => runPetAction('study')} className="rounded-xl bg-violet-500 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50">上学</button>
+              <button disabled={petBusy} onClick={() => runPetAction('work')} className="rounded-xl bg-sky-500 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50">工作</button>
+              <button disabled={petBusy} onClick={() => runPetAction('sleep')} className="rounded-xl bg-indigo-500 px-2 py-2 text-xs font-semibold text-white disabled:opacity-50">睡觉</button>
+            </div>
+            <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-300">{`当前状态：${pet.activity === 'study' ? '正在上学' : pet.activity === 'work' ? '正在工作' : pet.activity === 'sleep' ? '正在睡觉' : '自由活动'}`}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ['cuddle', Heart, '抱抱'],
+                ['play', Sparkles, '玩耍'],
+                ['walk', Footprints, '散步'],
+                ['clean', Brush, '清洁'],
+                ['bath', ShowerHead, '洗澡'],
+                ['train', Dumbbell, '训练'],
+                ['explore', Compass, '探险'],
+                ['dance', Music, '跳舞'],
+                ['guard', Shield, '守护'],
+              ] as const).map(([action, Icon, label]) => (
+                <button key={action} disabled={petBusy} onClick={() => runPetAction(action)} className="flex items-center justify-center gap-1 rounded-xl bg-gray-50 px-2 py-2 text-xs font-semibold text-gray-700 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-200">
+                  <Icon size={14} /> {label}
+                </button>
+              ))}
+            </div>
+            <div className={`rounded-2xl px-3 py-3 text-xs ${pet.mood === 'sick' ? 'bg-red-50 text-red-500 dark:bg-red-950/20' : pet.mood === 'sad' ? 'bg-blue-50 text-blue-500 dark:bg-blue-950/20' : 'bg-green-50 text-green-600 dark:bg-green-950/20'}`}>
+              {pet.mood === 'sick' ? '已经很久没有聊天了，宠物有点生病。' : pet.mood === 'sad' ? '超过 24 小时没有聊天，宠物正在想你们。' : '宠物状态很好，继续保持互动。'}
+            </div>
+            <div className="flex items-center justify-between rounded-2xl bg-amber-50 px-3 py-3 text-xs text-amber-700 dark:bg-amber-950/20 dark:text-amber-300">
+              <div>
+                <p className="font-semibold">{`补签卡 ${pet.repairCards || 0} 张`}</p>
+                <p className="mt-0.5 text-[11px] opacity-75">{pet.repairableDay ? `可恢复 ${pet.repairableDay} 的中断` : '中断一天后可使用补签卡恢复连续互动'}</p>
+              </div>
+              {pet.repairableDay && (
+                <button disabled={petBusy || !pet.repairCards} onClick={repairPetStreak} className="rounded-xl bg-amber-500 px-3 py-2 font-semibold text-white disabled:opacity-50">
+                  补签
+                </button>
+              )}
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/20">
+              <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-300">
+                <span>{`\u6210\u957f\u7ecf\u9a8c ${pet.experience % PET_EXP_PER_LEVEL}/${PET_EXP_PER_LEVEL}`}</span>
+                <span>{`\u8ddd\u79bb\u4e0b\u4e00\u7ea7 ${PET_EXP_PER_LEVEL - (pet.experience % PET_EXP_PER_LEVEL)} \u7ecf\u9a8c`}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-amber-100 dark:bg-amber-900/30">
+                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${((pet.experience % PET_EXP_PER_LEVEL) / PET_EXP_PER_LEVEL) * 100}%` }} />
+              </div>
+              <p className="mt-3 text-xs leading-5 text-amber-700 dark:text-amber-300">{'\u4f60\u4eec\u6bcf\u53d1\u9001 1 \u6761\u79c1\u804a\uff0c\u5ba0\u7269\u589e\u52a0 1 \u7ecf\u9a8c\u3002\u6bcf 20 \u7ecf\u9a8c\u5347 1 \u7ea7\uff0c\u6bcf 5 \u6761\u6d88\u606f\u989d\u5916\u589e\u52a0 1 \u4eb2\u5bc6\u5ea6\u3002'}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                <p className="text-[11px] text-gray-400">{'\u4eca\u65e5\u804a\u5929'}</p>
+                <p className="mt-1 text-lg font-bold text-gray-800 dark:text-gray-100">{pet.todayMessageCount || 0}</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                <p className="text-[11px] text-gray-400">{'\u8fde\u7eed\u4e92\u52a8'}</p>
+                <p className="mt-1 text-lg font-bold text-gray-800 dark:text-gray-100">{`${pet.streakDays || 0} \u5929`}</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200">{'\u4eca\u65e5\u5171\u540c\u4efb\u52a1'}</p>
+                <span className={`text-[11px] ${pet.todayMutual ? 'text-green-500' : 'text-gray-400'}`}>{pet.todayMutual ? '\u53cc\u65b9\u5df2\u4e92\u52a8' : '\u7b49\u5f85\u53cc\u65b9\u4e92\u52a8'}</span>
+              </div>
+              <div className="space-y-2">
+                {(pet.dailyTasks || []).map(task => (
+                  <div key={task.target} className="flex items-center gap-2 text-xs">
+                    <span className={task.completed ? 'text-green-500' : 'text-gray-300'}>{task.completed ? '\u2713' : '\u25cb'}</span>
+                    <span className="min-w-0 flex-1 text-gray-600 dark:text-gray-300">{`${task.label} \u00b7 ${task.target} \u6761\u79c1\u804a`}</span>
+                    <span className="text-amber-500">{`+${task.bonusExperience} \u7ecf\u9a8c`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+              <p className="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-200">共同成就</p>
+              <div className="space-y-2">
+                {(pet.achievementTasks || []).map(task => (
+                  <div key={task.key} className="flex items-center gap-2 text-xs">
+                    <span className={task.completed ? 'text-green-500' : 'text-gray-300'}>{task.completed ? '\u2713' : '\u25cb'}</span>
+                    <span className="min-w-0 flex-1 text-gray-600 dark:text-gray-300">{task.label}</span>
+                    <span className="text-gray-400">{`${Math.min(task.progress, task.target)}/${task.target} ${task.unit}`}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl bg-violet-50 p-3 text-xs leading-5 text-violet-700 dark:bg-violet-950/20 dark:text-violet-300">
+              {'\u6210\u957f\u9636\u6bb5\uff1a1 \u7ea7\u5e7c\u5e74 \u2192 3 \u7ea7\u6210\u957f \u2192 6 \u7ea7\u6d3b\u529b \u2192 10 \u7ea7\u661f\u8f89\u3002\u6bcf\u5929\u5b8c\u6210\u5171\u540c\u4efb\u52a1\uff0c\u53ef\u4ee5\u66f4\u5feb\u5347\u7ea7\u3002'}
+            </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {emojiPreview && (
         <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center" onClick={() => setEmojiPreview(null)}>
           <img src={emojiPreview} alt="" className="max-w-[80vw] max-h-[60vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
@@ -1789,7 +2411,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       {showGroupOrbit && isGroup && (
         <GroupOrbitView
           groupId={peerId}
-          groupName={groupName}
+          groupName={liveGroupName}
           onClose={() => setShowGroupOrbit(false)}
         />
       )}

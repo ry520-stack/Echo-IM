@@ -67,11 +67,11 @@ export default function SearchMessagesPage() {
 
   const openResult = (msg: SearchResult) => {
     if (msg.groupId) {
-      nav(`/chat/${msg.groupId}`);
+      nav(`/chat/${msg.groupId}?focus=${msg.id}`);
       return;
     }
     const targetId = msg.senderId === user?.id ? msg.receiverId : msg.senderId;
-    if (targetId) nav(`/chat/${targetId}`);
+    if (targetId) nav(`/chat/${targetId}?focus=${msg.id}`);
   };
 
   return (

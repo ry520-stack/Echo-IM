@@ -58,11 +58,11 @@ services:
     container_name: echo-grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: admin                  # 默认管理员
-      GF_SECURITY_ADMIN_PASSWORD: echo2026           # 首次登录后建议修改
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: 'false'                # 禁止自行注册
       GF_USERS_DEFAULT_LANGUAGE: zh-Hans             # 默认中文界面
-      GF_SERVER_ROOT_URL: 'http://localhost:3000'
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -114,7 +114,7 @@ services:
     restart: unless-stopped
     environment:
       # 连接到 Echo 的 PostgreSQL（通过 echo_default 网络）
-      DATA_SOURCE_NAME: 'postgresql://echo_user:echo_pass@echo-db-1:5432/echo_db?sslmode=disable'
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?set POSTGRES_EXPORTER_DSN in .env}
     ports:
       - '9187:9187'
     networks:

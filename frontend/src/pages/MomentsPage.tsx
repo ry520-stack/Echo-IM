@@ -87,6 +87,8 @@ export default function MomentsPage() {
   const [draggingImageUrl, setDraggingImageUrl] = useState<string | null>(null);
   const deleteZoneRef = useRef<HTMLDivElement>(null);
   const momentDragUrlRef = useRef<string | null>(null);
+  const momentLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const momentPointerStartRef = useRef({ x: 0, y: 0 });
   // Grid expand state per moment
   const [expandedGrids, setExpandedGrids] = useState<Set<string>>(new Set());
   const gridTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,6 +101,10 @@ export default function MomentsPage() {
     }
     return () => { if (gridTimerRef.current) clearTimeout(gridTimerRef.current); };
   }, [expandedGrids]);
+
+  useEffect(() => () => {
+    if (momentLongPressRef.current) clearTimeout(momentLongPressRef.current);
+  }, []);
 
   useEffect(() => {
     const syncAccent = () => setAccentColor(localStorage.getItem('echo-accent-color') || 'purple');
@@ -479,20 +485,42 @@ export default function MomentsPage() {
                       className="relative aspect-square touch-none"
                       onPointerDown={(e) => {
                         if (coverPickMode) return;
-                        momentDragUrlRef.current = url;
-                        setDraggingImageUrl(url);
-                        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                        const target = e.currentTarget;
+                        const pointerId = e.pointerId;
+                        momentPointerStartRef.current = { x: e.clientX, y: e.clientY };
+                        if (momentLongPressRef.current) clearTimeout(momentLongPressRef.current);
+                        momentLongPressRef.current = setTimeout(() => {
+                          momentDragUrlRef.current = url;
+                          setDraggingImageUrl(url);
+                          try { target.setPointerCapture?.(pointerId); } catch {}
+                        }, 450);
                       }}
                       onPointerMove={(e) => {
-                        if (!momentDragUrlRef.current) return;
+                        if (!momentDragUrlRef.current) {
+                          const dx = Math.abs(e.clientX - momentPointerStartRef.current.x);
+                          const dy = Math.abs(e.clientY - momentPointerStartRef.current.y);
+                          if ((dx > 8 || dy > 8) && momentLongPressRef.current) {
+                            clearTimeout(momentLongPressRef.current);
+                            momentLongPressRef.current = null;
+                          }
+                          return;
+                        }
                         e.preventDefault();
                         const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-moment-img]') as HTMLElement | null;
                         const toUrl = target?.dataset.momentImg;
                         if (toUrl && toUrl !== momentDragUrlRef.current) moveUploadedImage(momentDragUrlRef.current, toUrl);
                       }}
                       onPointerUp={(e) => {
+                        if (momentLongPressRef.current) clearTimeout(momentLongPressRef.current);
+                        momentLongPressRef.current = null;
                         try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch {}
                         if (momentDragUrlRef.current) handleImageDragEnd(momentDragUrlRef.current, { point: { x: e.clientX, y: e.clientY } });
+                        momentDragUrlRef.current = null;
+                        setDraggingImageUrl(null);
+                      }}
+                      onPointerCancel={() => {
+                        if (momentLongPressRef.current) clearTimeout(momentLongPressRef.current);
+                        momentLongPressRef.current = null;
                         momentDragUrlRef.current = null;
                         setDraggingImageUrl(null);
                       }}
@@ -505,7 +533,7 @@ export default function MomentsPage() {
                       <img
                         src={assetUrl(url)}
                         alt=""
-                        className={(i === coverIndex ? 'ring-1 ' + selectedRing + ' ' : coverPickMode ? 'ring-1 ring-primary-200 ' : 'ring-1 ring-gray-100 dark:ring-gray-800 ') + 'h-full w-full rounded-xl object-cover transition-all'}
+                        className={(i === coverIndex ? 'ring-1 ' + selectedRing + ' ' : coverPickMode ? 'ring-1 ring-primary-200 ' : 'ring-1 ring-gray-100 dark:ring-gray-800 ') + (draggingImageUrl === url ? 'scale-95 opacity-70 ' : '') + 'h-full w-full rounded-xl object-cover transition-all'}
                         onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="%23f0f0f0" width="100" height="100"/></svg>'; }}
                       />
                     </div>

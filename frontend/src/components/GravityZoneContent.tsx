@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useBackground } from '../hooks/useBackground';
 import GravityLockedCard from './GravityLockedCard';
 import { assetUrl } from '../utils/assetUrl';
+import { api } from '../api/client';
 
 const GRAVITY_KEY = 'echo-favorites';
 const GRAVITY_PINNED_KEY = 'echo-gravity-pinned';
@@ -23,6 +24,7 @@ export default function GravityZoneContent({ searchText }: { searchText: string 
   const isDark = theme === 'dark';
   const bgUrl = getBg('gravity');
   const [items, setItems] = useState<any[]>(loadGravityItems);
+  const [chatStreaks, setChatStreaks] = useState<Record<string, number>>({});
   const [pinned, setPinned] = useState<Set<string>>(loadPinnedIds);
   const [ctxMenu, setCtxMenu] = useState<{ id: string; cardRect: DOMRect } | null>(null);
   const lockRef = useRef(false);
@@ -35,6 +37,12 @@ export default function GravityZoneContent({ searchText }: { searchText: string 
       window.removeEventListener('gravity-updated', syncData);
       window.removeEventListener('storage', syncData);
     };
+  }, []);
+
+  useEffect(() => {
+    api<Array<{ peer: { id: string }; chatStreak?: number }>>('GET', '/api/friends')
+      .then(friends => setChatStreaks(Object.fromEntries(friends.map(friend => [friend.peer.id, friend.chatStreak || 0]))))
+      .catch(() => {});
   }, []);
 
   const lock = () => {
@@ -91,6 +99,7 @@ export default function GravityZoneContent({ searchText }: { searchText: string 
                   <GravityLockedCard
                     name={item.peerName}
                     avatar={item.peerAvatar}
+                    chatStreak={chatStreaks[item.peerId] || 0}
                     isDark={isDark}
                     isPinned={pinned.has(item.id)}
                     onClick={() => {

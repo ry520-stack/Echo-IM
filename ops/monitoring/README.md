@@ -107,19 +107,23 @@
 # 1. 进入监控目录
 cd /root/Echo/ops/monitoring
 
-# 2. 创建 Docker 网络（如果不存在）
+# 2. 创建环境变量文件并修改密码/数据库连接
+cp .env.example .env
+vim .env
+
+# 3. 创建 Docker 网络（如果不存在）
 docker network ls | grep echo_default || echo "echo_default 网络不存在"
 
-# 3. 拉取所有镜像
+# 4. 拉取所有镜像
 docker compose -f docker-compose.monitoring.yml pull
 
-# 4. 启动监控栈
+# 5. 启动监控栈
 docker compose -f docker-compose.monitoring.yml up -d
 
-# 5. 检查所有容器状态
+# 6. 检查所有容器状态
 docker compose -f docker-compose.monitoring.yml ps
 
-# 6. 查看日志（如有问题）
+# 7. 查看日志（如有问题）
 docker compose -f docker-compose.monitoring.yml logs -f
 ```
 
@@ -127,7 +131,7 @@ docker compose -f docker-compose.monitoring.yml logs -f
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| Grafana | http://localhost:3000 | 登录：admin / echo2026 |
+| Grafana | http://localhost:3000 | 登录：见 `.env` 中的 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
 | Prometheus | http://localhost:9091 | 指标查询界面 |
 | Alertmanager | http://localhost:9093 | 告警管理界面 |
 | cAdvisor | http://localhost:8085 | 容器详情界面 |
@@ -146,7 +150,7 @@ curl -s http://localhost:9091/api/v1/targets | jq '.data.activeTargets[] | {job:
 curl -s http://localhost:9091/api/v1/rules | jq '.data.groups[].rules[] | {name: .name, state: .state}'
 
 # 查看 Grafana 数据源
-curl -s http://localhost:3000/api/datasources -u admin:echo2026
+curl -s http://localhost:3000/api/datasources -u "$GRAFANA_ADMIN_USER:$GRAFANA_ADMIN_PASSWORD"
 
 # 查看 Loki 日志
 curl -s "http://localhost:3100/loki/api/v1/query?query={job=~\".+\"}" | jq '.data.result[0].values[:5]'

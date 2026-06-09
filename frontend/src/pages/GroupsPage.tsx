@@ -120,9 +120,9 @@ export default function GroupsPage() {
       const group = await api<Group>('POST', '/api/groups', {
         name: groupName.trim(),
         avatar: avatarUrl || undefined,
+        notice: notice.trim() || undefined,
         memberIds: Array.from(selectedIds),
       });
-      if (notice.trim()) await api('PATCH', `/api/groups/${group.id}/profile`, { notice: notice.trim() });
       setCreateOpen(false);
       resetCreate();
       await fetchGroups();
@@ -200,6 +200,8 @@ export default function GroupsPage() {
 
   const memberAction = async (member: Member, action: 'admin' | 'member' | 'remove' | 'transfer') => {
     if (!activeGroup) return;
+    if (action === 'remove' && !window.confirm('\u786e\u5b9a\u5c06\u8be5\u6210\u5458\u79fb\u51fa\u7fa4\u804a\u5417\uff1f')) return;
+    if (action === 'transfer' && !window.confirm('\u786e\u5b9a\u8f6c\u8ba9\u7fa4\u4e3b\u5417\uff1f')) return;
     try {
       if (action === 'remove') await api('DELETE', `/api/groups/${activeGroup.id}/members/${member.userId}`);
       if (action === 'admin' || action === 'member') await api('PATCH', `/api/groups/${activeGroup.id}/members/${member.userId}/role`, { role: action });
@@ -214,6 +216,10 @@ export default function GroupsPage() {
 
   const leaveOrDismiss = async () => {
     if (!activeGroup) return;
+    const confirmation = activeGroup.role === 'owner'
+      ? '\u786e\u5b9a\u89e3\u6563\u7fa4\u804a\u5417\uff1f\u6b64\u64cd\u4f5c\u65e0\u6cd5\u64a4\u9500\u3002'
+      : '\u786e\u5b9a\u9000\u51fa\u7fa4\u804a\u5417\uff1f';
+    if (!window.confirm(confirmation)) return;
     try {
       if (activeGroup.role === 'owner') await api('DELETE', `/api/groups/${activeGroup.id}`);
       else await api('POST', `/api/groups/${activeGroup.id}/leave`);
@@ -343,6 +349,9 @@ export default function GroupsPage() {
                         <IconButton title="转让群主" onClick={() => memberAction(member, 'transfer')}><Crown size={14} /></IconButton>
                         <IconButton title="移出群聊" danger onClick={() => memberAction(member, 'remove')}><UserMinus size={14} /></IconButton>
                       </div>
+                    )}
+                    {activeGroup.role === 'admin' && member.role === 'member' && (
+                      <IconButton title={'\u79fb\u51fa\u7fa4\u804a'} danger onClick={() => memberAction(member, 'remove')}><UserMinus size={14} /></IconButton>
                     )}
                   </div>
                 ))}

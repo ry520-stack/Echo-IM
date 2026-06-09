@@ -98,6 +98,16 @@ export async function searchMessages(req: Request, res: Response) {
   }
 }
 
+export async function getMessageContext(req: Request, res: Response) {
+  try {
+    const messages = await messageService.getMessageContext(req.userId, req.params.id);
+    res.json(messages);
+  } catch (e: any) {
+    console.error('[getMessageContext Error]', e);
+    res.status(400).json({ error: e.message || 'Failed to get message context' });
+  }
+}
+
 export async function markRead(req: Request, res: Response) {
   const { peerId, groupId } = req.body;
   if (!peerId && !groupId) return res.status(400).json({ error: 'peerId or groupId is required' });

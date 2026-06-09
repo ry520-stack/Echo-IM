@@ -15,7 +15,9 @@ model User {
   digitalId           Int      @unique
   avatar              String   @default("")
   nickname            String   @default("")
+  gender              String   @default("")
   status              String   @default("")
+  presence            String   @default("online")
   autoReply           String   @default("")
   allowStrangerMessage  Boolean  @default(true)
   readReceiptsEnabled   Boolean  @default(true)
@@ -166,11 +168,115 @@ model Emoji {
   userId    String
   imageUrl  String
   name      String
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model PetBond {
+  id            String   @id @default(uuid())
+  userAId       String
+  userBId       String
+  requestedBy   String
+  status        String   @default("pending")
+  name          String   @default("Echo")
+  avatar        String   @default("")
+  level         Int      @default(1)
+  experience    Int      @default(0)
+  intimacy      Int      @default(0)
+  coins         Int      @default(20)
+  biscuits      Int      @default(1)
+  toys          Int      @default(0)
+  medicines     Int      @default(0)
+  activity      String   @default("idle")
+  activityUntil DateTime?
+  skin          String   @default("classic")
+  lastCheckInDay String  @default("")
+  repairCards   Int      @default(1)
+  repairedDays  String   @default("[]")
+  lastSpokeAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+}
+
+model CoupleBond {
+  id           String    @id @default(uuid())
+  userAId      String
+  userBId      String
+  requestedBy  String
+  status       String    @default("pending")
+  metAt        DateTime?
+  datingAt     DateTime?
+  countdownAt  DateTime?
+  countdownTitle String  @default("")
+  userACityCode String   @default("")
+  userACityName String   @default("")
+  userBCityCode String   @default("")
+  userBCityName String   @default("")
+  userALabel    String   @default("")
+  userBLabel    String   @default("")
+  userALat      Float?
+  userALng      Float?
+  userBLat      Float?
+  userBLng      Float?
+  userAPeriodStart DateTime?
+  userACycleLength Int   @default(28)
+  userAPeriodLength Int  @default(5)
+  userAShareCycle Boolean @default(false)
+  userBPeriodStart DateTime?
+  userBCycleLength Int   @default(28)
+  userBPeriodLength Int  @default(5)
+  userBShareCycle Boolean @default(false)
+  bondedAt     DateTime?
+  lastSosAt    DateTime?
+  lastSosBy    String    @default("")
+  endedAt      DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@index([status])
+}
+
+model CoupleContract {
+  id         String   @id @default(uuid())
+  coupleId   String
+  createdBy  String
+  title      String
+  content    String   @default("")
+  deadline   DateTime?
+  penalty    String   @default("")
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([coupleId, status, createdAt])
+}
+
+model CoupleItem {
+  id        String   @id @default(uuid())
+  coupleId  String
+  createdBy String
+  type      String
+  title     String   @default("")
+  content   String   @default("")
+  images    String   @default("[]")
+  cityName  String   @default("")
+  happenedAt DateTime?
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coupleId, type, createdAt])
 }
 
 model Moment {

@@ -120,7 +120,7 @@ export default function PersonalOrbitView({
   };
 
   const dataCards = [
-    { label: '展示星域', value: summary?.displayGroup?.name || '暂无', onClick: () => setGroupModalOpen(true) },
+    { label: '展示分组', value: summary?.displayGroup?.name || '暂无', onClick: () => setGroupModalOpen(true) },
     {
       label: '认识时间',
       value: showRealMetAt ? formatDate(summary?.realMetAt) : formatDate(summary?.friendSince),
@@ -150,7 +150,7 @@ export default function PersonalOrbitView({
       >
         <header className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
           <button onClick={onClose} className="rounded-xl p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">←</button>
-          <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100">与 {peerName} 的星域</h1>
+          <h1 className="text-base font-semibold text-gray-900 dark:text-gray-100">与 {peerName} 的关系空间</h1>
         </header>
 
         <div className="flex-1 overflow-y-auto">
@@ -236,7 +236,7 @@ export default function PersonalOrbitView({
           </section>
         </div>
 
-        <Modal open={groupModalOpen} onClose={() => setGroupModalOpen(false)} title="选择展示星域">
+        <Modal open={groupModalOpen} onClose={() => setGroupModalOpen(false)} title="选择展示分组">
           <div className="space-y-2">
             {summary?.groups.length ? summary.groups.map(group => (
               <button
@@ -249,9 +249,9 @@ export default function PersonalOrbitView({
                 {summary.displayGroupId === group.id && <span className="text-xs text-primary-500">当前</span>}
               </button>
             )) : (
-              <p className="py-4 text-center text-gray-400">暂无可选星域</p>
+              <p className="py-4 text-center text-gray-400">暂无可选分组</p>
             )}
-            <button onClick={() => selectDisplayGroup(null)} className="w-full rounded-xl px-3 py-2 text-left text-sm text-gray-400">不展示星域</button>
+            <button onClick={() => selectDisplayGroup(null)} className="w-full rounded-xl px-3 py-2 text-left text-sm text-gray-400">不展示分组</button>
           </div>
         </Modal>
 

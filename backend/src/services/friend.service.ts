@@ -1,6 +1,70 @@
 import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
 
+function notifyRelationshipUpdated(userId: string, peerId: string, action: string) {
+  const io = getIO();
+  if (!io) return;
+  io.to(`user:${userId}`).emit('relationship:updated', { action, peerId });
+  io.to(`user:${peerId}`).emit('relationship:updated', { action, peerId: userId });
+}
+
+async function removeFriendGroupMemberships(userId: string, peerId: string) {
+  await prisma.friendGroupMember.deleteMany({
+    where: {
+      OR: [
+        { peerId, group: { userId } },
+        { peerId: userId, group: { userId: peerId } },
+      ],
+    },
+  });
+}
+
+const CHAT_STREAK_LOOKBACK_DAYS = 110;
+
+function chinaDateKey(value: Date) {
+  return new Date(value.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function shiftChinaDateKey(value: Date, days: number) {
+  return chinaDateKey(new Date(value.getTime() + days * 24 * 60 * 60 * 1000));
+}
+
+async function calculateChatStreak(userId: string, peerId: string) {
+  const since = new Date(Date.now() - CHAT_STREAK_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const messages = await prisma.message.findMany({
+    where: {
+      OR: [
+        { senderId: userId, receiverId: peerId },
+        { senderId: peerId, receiverId: userId },
+      ],
+      type: { notIn: ['pet', 'pet-adopt', 'call'] },
+      createdAt: { gte: since },
+    },
+    select: { senderId: true, createdAt: true },
+  });
+  const sendersByDay = new Map<string, Set<string>>();
+  messages.forEach(message => {
+    const key = chinaDateKey(message.createdAt);
+    const senders = sendersByDay.get(key) || new Set<string>();
+    senders.add(message.senderId);
+    sendersByDay.set(key, senders);
+  });
+  const isMutualDay = (key: string) => {
+    const senders = sendersByDay.get(key);
+    return !!senders?.has(userId) && !!senders?.has(peerId);
+  };
+  const now = new Date();
+  const today = chinaDateKey(now);
+  const yesterday = shiftChinaDateKey(now, -1);
+  let cursor = isMutualDay(today) ? today : isMutualDay(yesterday) ? yesterday : '';
+  let streak = 0;
+  while (cursor && isMutualDay(cursor)) {
+    streak += 1;
+    cursor = shiftChinaDateKey(new Date(`${cursor}T00:00:00+08:00`), -1);
+  }
+  return streak;
+}
+
 export async function getFriends(userId: string) {
   const friendships = await prisma.friend.findMany({
     where: {
@@ -21,7 +85,7 @@ export async function getFriends(userId: string) {
     orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
   });
 
-  return friendships.map(f => {
+  return Promise.all(friendships.map(async f => {
     const isInitiator = f.userId === userId;
     const peer = isInitiator ? f.friend : f.user;
     return {
@@ -30,8 +94,9 @@ export async function getFriends(userId: string) {
       alias: f.alias,
       isPinned: f.isPinned,
       createdAt: f.createdAt,
+      chatStreak: await calculateChatStreak(userId, peer.id),
     };
-  });
+  }));
 }
 
 async function findAcceptedRelation(userId: string, peerId: string) {
@@ -126,9 +191,10 @@ export async function getRelationshipSummary(userId: string, peerId: string) {
     select: { id: true, name: true, color: true },
   });
   const displayGroup = groups.find(g => g.id === relation.displayGroupId) || groups[0] || null;
-  const [echoValue, lastConnectionAt] = await Promise.all([
+  const [echoValue, lastConnectionAt, chatStreak] = await Promise.all([
     calculateRelationshipScore(userId, peerId),
     getLastConnectionAt(userId, peerId),
+    calculateChatStreak(userId, peerId),
   ]);
 
   return {
@@ -140,6 +206,7 @@ export async function getRelationshipSummary(userId: string, peerId: string) {
     groups,
     echoValue,
     lastConnectionAt,
+    chatStreak,
   };
 }
 
@@ -239,6 +306,7 @@ export async function sendRequest(userId: string, peerId: string, alias?: string
         io.to(`user:${peerId}`).emit('friend:accepted', { by: userId });
         io.to(`user:${userId}`).emit('friend:accepted', { by: peerId });
       }
+      notifyRelationshipUpdated(userId, peerId, 'accepted');
       return { status: 'accepted', message: '好友添加成功' };
     }
 
@@ -286,6 +354,16 @@ export async function acceptRequest(requestId: string, userId: string) {
   if (req.friendId !== userId) throw new Error('无权操作');
   if (req.status !== 'pending') throw new Error('请求状态不正确');
 
+  const blocked = await prisma.blockList.findFirst({
+    where: {
+      OR: [
+        { blockerId: req.userId, blockedId: req.friendId },
+        { blockerId: req.friendId, blockedId: req.userId },
+      ],
+    },
+  });
+  if (blocked) throw new Error('Unable to accept request while a block exists');
+
   const updated = await prisma.friend.update({
     where: { id: requestId },
     data: { status: 'accepted', deletedBy: null, deletedAt: null, blockedBy: null, blockedAt: null },
@@ -295,6 +373,7 @@ export async function acceptRequest(requestId: string, userId: string) {
   if (io) {
     io.to(`user:${req.userId}`).emit('friend:accepted', { by: userId });
   }
+  notifyRelationshipUpdated(req.userId, req.friendId, 'accepted');
 
   return updated;
 }
@@ -329,11 +408,13 @@ export async function removeFriend(friendshipId: string, userId: string) {
   const peerId = f.userId === userId ? f.friendId : f.userId;
 
   if (f.status === 'deleted' && f.deletedBy && f.deletedBy !== userId) {
+    await removeFriendGroupMemberships(userId, peerId);
     const deleted = await prisma.friend.delete({ where: { id: friendshipId } });
     const io = getIO();
     if (io) {
       io.to(`user:${peerId}`).emit('friend:removed', { by: userId, friendshipId });
     }
+    notifyRelationshipUpdated(userId, peerId, 'removed');
     return deleted;
   }
 
@@ -345,12 +426,14 @@ export async function removeFriend(friendshipId: string, userId: string) {
       deletedAt: new Date(),
     },
   });
+  await removeFriendGroupMemberships(userId, peerId);
 
   // 通知对方
   const io = getIO();
   if (io) {
     io.to(`user:${peerId}`).emit('friend:removed', { by: userId, friendshipId });
   }
+  notifyRelationshipUpdated(userId, peerId, 'removed');
 
   return updated;
 }

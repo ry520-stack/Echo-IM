@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Phone, PhoneOff, MicOff, Mic } from 'lucide-react';
+import { Phone, PhoneOff, MicOff, Mic, Minimize2 } from 'lucide-react';
 import { type CallStatus } from '../hooks/useWebRTC';
 import { assetUrl } from '../utils/assetUrl';
 
@@ -12,9 +12,10 @@ interface CallScreenProps {
   onReject: () => void;
   onHangup: () => void;
   onToggleMute: () => void;
+  onMinimize: () => void;
 }
 
-export default function CallScreen({ status, peerName, peerAvatar, isMuted, onAccept, onReject, onHangup, onToggleMute }: CallScreenProps) {
+export default function CallScreen({ status, peerName, peerAvatar, isMuted, onAccept, onReject, onHangup, onToggleMute, onMinimize }: CallScreenProps) {
   if (status === 'idle') return null;
 
   return (
@@ -22,6 +23,15 @@ export default function CallScreen({ status, peerName, peerAvatar, isMuted, onAc
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-zinc-950/95 text-white p-8 backdrop-blur-md"
     >
+      <button
+        type="button"
+        onClick={onMinimize}
+        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+        aria-label="收起通话界面"
+        title="收起通话界面"
+      >
+        <Minimize2 size={18} />
+      </button>
       <div className="flex flex-col items-center mt-20 gap-4">
         <div className="w-24 h-24 rounded-3xl bg-primary-500/20 flex items-center justify-center text-3xl border border-white/10 shadow-2xl overflow-hidden">
           {peerAvatar ? <img src={assetUrl(peerAvatar)} alt="" className="w-full h-full object-cover" /> : peerName[0]?.toUpperCase()}

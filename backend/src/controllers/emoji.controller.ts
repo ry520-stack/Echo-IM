@@ -43,3 +43,14 @@ export async function batchDeleteEmojis(req: Request, res: Response) {
     res.status(500).json({ error: '批量删除失败' });
   }
 }
+
+export async function reorderEmojis(req: Request, res: Response) {
+  const { ids } = req.body;
+  if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids is required' });
+  try {
+    await emojiService.reorderEmojis(ids, req.userId);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+}

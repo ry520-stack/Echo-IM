@@ -17,6 +17,8 @@ import blockRoutes from './routes/block.routes';
 import backgroundRoutes from './routes/background.routes';
 import friendGroupRoutes from './routes/friendGroup.routes';
 import pushRoutes from './routes/push.routes';
+import petRoutes from './routes/pet.routes';
+import coupleRoutes from './routes/couple.routes';
 
 const app = express();
 
@@ -93,6 +95,9 @@ app.use('/api/blocks', blockRoutes);
 app.use('/api/backgrounds', backgroundRoutes);
 app.use('/api/friend-groups', friendGroupRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/pets', petRoutes);
+app.use('/api/couple', coupleRoutes);
+app.use('/api/couples', coupleRoutes);
 
 // Multer 文件上传错误处理
 app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

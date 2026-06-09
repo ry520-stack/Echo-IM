@@ -32,14 +32,14 @@ export async function prepareMomentImage(file: File): Promise<File> {
 // 表情包专用压缩（画质优先），返回 [file, compressed]
 export async function compressEmoji(file: File): Promise<[File, boolean]> {
   if (file.type === 'image/gif') return [file, true];
-  // 小图和表情尽量保留原图，避免糊
-  if (file.size <= 5 * 1024 * 1024) return [file, true];
+  // 表情优先保留原图，只在超过服务端上传上限时压缩。
+  if (file.size <= 30 * 1024 * 1024) return [file, true];
   try {
     const result = await imageCompression(file, {
-      maxSizeMB: 6,
-      maxWidthOrHeight: 2200,
+      maxSizeMB: 28,
+      maxWidthOrHeight: 4096,
       useWebWorker: true,
-      initialQuality: 0.96,
+      initialQuality: 0.98,
     });
     return [result, true];
   } catch {
