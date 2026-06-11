@@ -8,17 +8,6 @@ function notifyRelationshipUpdated(userId: string, peerId: string, action: strin
   io.to(`user:${peerId}`).emit('relationship:updated', { action, peerId: userId });
 }
 
-async function removeFriendGroupMemberships(userId: string, peerId: string) {
-  await prisma.friendGroupMember.deleteMany({
-    where: {
-      OR: [
-        { peerId, group: { userId } },
-        { peerId: userId, group: { userId: peerId } },
-      ],
-    },
-  });
-}
-
 export async function blockUser(blockerId: string, blockedId: string) {
   if (blockerId === blockedId) throw new Error('不能拉黑自己');
 
@@ -27,25 +16,7 @@ export async function blockUser(blockerId: string, blockedId: string) {
   });
   if (existing) throw new Error('已拉黑该用户');
 
-  // 创建 blockList 记录
   const block = await prisma.blockList.create({ data: { blockerId, blockedId } });
-
-  // 同步更新 Friend 关系为 blocked
-  await prisma.friend.updateMany({
-    where: {
-      OR: [
-        { userId: blockerId, friendId: blockedId },
-        { userId: blockedId, friendId: blockerId },
-      ],
-      status: { in: ['accepted', 'pending', 'deleted', 'rejected'] },
-    },
-    data: {
-      status: 'blocked',
-      blockedBy: blockerId,
-      blockedAt: new Date(),
-    },
-  });
-  await removeFriendGroupMemberships(blockerId, blockedId);
 
   notifyRelationshipUpdated(blockerId, blockedId, 'blocked');
   return block;
@@ -57,10 +28,7 @@ export async function unblockUser(blockerId: string, blockedId: string) {
   });
   if (!block) throw new Error('未拉黑该用户');
 
-  // 删除 blockList 记录
   await prisma.blockList.delete({ where: { id: block.id } });
-
-  // 不自动恢复好友关系，改为 deleted
   await prisma.friend.updateMany({
     where: {
       OR: [
@@ -71,18 +39,18 @@ export async function unblockUser(blockerId: string, blockedId: string) {
       blockedBy: blockerId,
     },
     data: {
-      status: 'deleted',
-      deletedBy: blockerId,
-      deletedAt: new Date(),
+      status: 'accepted',
       blockedBy: null,
       blockedAt: null,
+      deletedBy: null,
+      deletedAt: null,
     },
   });
   notifyRelationshipUpdated(blockerId, blockedId, 'unblocked');
 }
 
 export async function getBlockedUsers(blockerId: string) {
-  return prisma.blockList.findMany({
+  const blocks = await prisma.blockList.findMany({
     where: { blockerId },
     include: {
       blocked: {
@@ -91,6 +59,17 @@ export async function getBlockedUsers(blockerId: string) {
     },
     orderBy: { createdAt: 'desc' },
   });
+  return Promise.all(blocks.map(async block => ({
+    ...block,
+    hiddenMessageCount: await prisma.message.count({
+      where: {
+        senderId: block.blockedId,
+        receiverId: blockerId,
+        createdAt: { gt: block.createdAt },
+        isRecalled: false,
+      },
+    }),
+  })));
 }
 
 export async function isBlocked(userId: string, targetId: string): Promise<boolean> {

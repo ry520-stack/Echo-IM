@@ -282,6 +282,43 @@ model CoupleItem {
   @@index([coupleId, type, createdAt])
 }
 
+model AlbumGroup {
+  id          String   @id @default(uuid())
+  userId      String
+  coupleId    String?
+  type        String   @default("couple")
+  title       String   @default("日常碎片")
+  date        String?
+  location    String?
+  description String?
+  coverUrl    String?
+  endDate     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([coupleId])
+}
+
+model AlbumPhoto {
+  id          String   @id @default(uuid())
+  groupId     String
+  url         String   @default("")
+  originalUrl String   @default("")
+  previewUrl  String   @default("")
+  thumbUrl    String   @default("")
+  type        String   @default("image")
+  width       Int?
+  height      Int?
+  duration    Float?
+  size        Int?
+  sortOrder   Int      @default(0)
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([groupId])
+}
+
 model Moment {
   id           String             @id @default(uuid())
   userId       String

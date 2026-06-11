@@ -9,8 +9,8 @@ export interface PermissionResult {
 }
 
 /**
- * 统一判断私聊消息权限
- * 判断顺序: 自己发给自己 → 双向拉黑 → 好友关系 → 陌生人开关
+ * 统一判断私聊消息权限。
+ * 拉黑只屏蔽对方消息展示，不再破坏好友关系，也不阻止双方继续发送。
  */
 export async function canSendPrivateMessage(senderId: string, receiverId: string): Promise<PermissionResult> {
   // 1. 不能给自己发
@@ -18,22 +18,7 @@ export async function canSendPrivateMessage(senderId: string, receiverId: string
     return { ok: false, code: 'SELF_MESSAGE', message: '不能给自己发消息' };
   }
 
-  // 2. 双向拉黑检查
-  const blockedByReceiver = await prisma.blockList.findUnique({
-    where: { blockerId_blockedId: { blockerId: receiverId, blockedId: senderId } },
-  });
-  if (blockedByReceiver) {
-    return { ok: false, code: 'BLOCKED_BY_RECEIVER', message: '消息已发出，但被对方拒收了' };
-  }
-
-  const blockedBySender = await prisma.blockList.findUnique({
-    where: { blockerId_blockedId: { blockerId: senderId, blockedId: receiverId } },
-  });
-  if (blockedBySender) {
-    return { ok: false, code: 'BLOCKED_BY_SENDER', message: '你已拉黑对方，请先取消拉黑' };
-  }
-
-  // 3. 好友关系检查
+  // 2. 好友关系检查
   const relation = await prisma.friend.findFirst({
     where: {
       OR: [
@@ -49,7 +34,7 @@ export async function canSendPrivateMessage(senderId: string, receiverId: string
     }
 
     if (relation.status === 'blocked') {
-      return { ok: false, code: 'RELATION_BLOCKED', message: '无法发送消息', relation };
+      return { ok: true, isFriend: true, relation };
     }
 
     if (relation.status === 'deleted') {
@@ -70,7 +55,7 @@ export async function canSendPrivateMessage(senderId: string, receiverId: string
     }
   }
 
-  // 4. 没有 accepted 关系 → 检查陌生人开关
+  // 3. 没有 accepted 关系 → 检查陌生人开关
   const receiver = await prisma.user.findUnique({
     where: { id: receiverId },
     select: { allowStrangerMessage: true },
@@ -80,7 +65,7 @@ export async function canSendPrivateMessage(senderId: string, receiverId: string
     return { ok: false, code: 'FRIEND_REQUIRED', message: '对方开启了好友验证，你还不是他（她）好友', relation: relation || null };
   }
 
-  // 5. 允许陌生人消息
+  // 4. 允许陌生人消息
   return { ok: true, isFriend: false, relation: relation || null };
 }
 
@@ -88,17 +73,6 @@ export async function canSendPrivateMessage(senderId: string, receiverId: string
  * 判断是否可以访问聊天历史
  */
 export async function canAccessConversation(userId: string, peerId: string): Promise<boolean> {
-  // 拉黑检查
-  const blocked = await prisma.blockList.findFirst({
-    where: {
-      OR: [
-        { blockerId: userId, blockedId: peerId },
-        { blockerId: peerId, blockedId: userId },
-      ],
-    },
-  });
-  if (blocked) return false;
-
   // 关系检查
   const relation = await prisma.friend.findFirst({
     where: {
@@ -112,7 +86,6 @@ export async function canAccessConversation(userId: string, peerId: string): Pro
   if (relation) {
     // 对方删除了我 → 不能访问
     if (relation.status === 'deleted' && relation.deletedBy === peerId) return false;
-    if (relation.status === 'blocked') return false;
   }
 
   return true;

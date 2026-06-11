@@ -32,13 +32,11 @@ const fileFilter = (_req: any, file: Express.Multer.File, cb: multer.FileFilterC
 export const videoUpload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
 export const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 30 * 1024 * 1024 }, // 30MB (清晰图片/GIF/音频)
 });
 
 export const ringtoneUpload = multer({

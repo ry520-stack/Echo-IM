@@ -49,10 +49,16 @@ export default function ChatPage() {
   const [showChatMobile, setShowChatMobile] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [searchTab, setSearchTab] = useState<'contacts' | 'messages'>('contacts');
+  const [missNotice, setMissNotice] = useState('');
 
   useEffect(() => {
     if (!socket) return;
-    const onSos = (data: { message?: string }) => toast(data.message || '对方想你了', 'info');
+    const onSos = (data: { message?: string }) => {
+      const message = data.message || '对方想你了';
+      setMissNotice(message);
+      toast(message, 'info');
+      window.setTimeout(() => setMissNotice(''), 3600);
+    };
     socket.on('couple:sos', onSos);
     return () => { socket.off('couple:sos', onSos); };
   }, [socket, toast]);
@@ -163,6 +169,19 @@ export default function ChatPage() {
       }}
     >
       <SidebarDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <AnimatePresence>
+        {missNotice && (
+          <motion.div
+            initial={{ y: -24, opacity: 0, scale: 0.96 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -24, opacity: 0, scale: 0.96 }}
+            className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top,0px)+16px)] z-[90] w-[86%] max-w-sm -translate-x-1/2 rounded-[24px] bg-white/92 px-4 py-3 text-center shadow-2xl shadow-rose-500/15 ring-1 ring-rose-100 backdrop-blur-xl dark:bg-gray-900/92 dark:ring-rose-900/30"
+          >
+            <p className="text-xs font-semibold text-rose-400">情侣空间</p>
+            <p className="mt-1 text-sm font-bold text-gray-950 dark:text-gray-50">{missNotice}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {!isChatOpen && (
         <header className="shrink-0 border-b border-gray-100/60 bg-white/88 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/88">

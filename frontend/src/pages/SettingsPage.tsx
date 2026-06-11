@@ -13,6 +13,7 @@ import { useSocket } from '../contexts/SocketContext';
 interface BlockEntry {
   id: string;
   blocked: { id: string; username: string; nickname: string; avatar: string; digitalId: number };
+  hiddenMessageCount?: number;
 }
 
 export default function SettingsPage() {
@@ -316,6 +317,7 @@ export default function SettingsPage() {
                 <div key={b.id} className="flex items-center justify-between py-1">
                   <span className="text-sm text-gray-700 dark:text-gray-300">
                     {b.blocked.nickname || b.blocked.username} (ID: {b.blocked.digitalId})
+                    {!!b.hiddenMessageCount && <span className="ml-2 text-xs text-orange-500">隐藏 {b.hiddenMessageCount} 条新消息</span>}
                   </span>
                   <button onClick={() => unblock(b.blocked.id)} className="text-xs text-red-400 hover:underline">取消拉黑</button>
                 </div>

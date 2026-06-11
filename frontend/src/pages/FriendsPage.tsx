@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from '../components/Modal';
 import { api } from '../api/client';
+import { assetUrl } from '../utils/assetUrl';
 
 interface Peer {
   id: string;
@@ -159,7 +160,7 @@ export default function FriendsPage() {
   };
 
   const blockFriend = async (userId: string) => {
-    if (!window.confirm('\u786e\u5b9a\u62c9\u9ed1\u8be5\u7528\u6237\u5417\uff1f\u62c9\u9ed1\u540e\u53cc\u65b9\u5c06\u65e0\u6cd5\u4e92\u53d1\u79c1\u804a\u6d88\u606f\u3002')) return;
+    if (!window.confirm('\u786e\u5b9a\u62c9\u9ed1\u8be5\u7528\u6237\u5417\uff1f\u62c9\u9ed1\u540e\u5bf9\u65b9\u53d1\u6765\u7684\u65b0\u6d88\u606f\u4f1a\u6682\u65f6\u9690\u85cf\uff0c\u53d6\u6d88\u62c9\u9ed1\u540e\u53ef\u4ee5\u67e5\u770b\u3002')) return;
     try {
       await api('POST', '/api/blocks/' + userId);
       toast('已拉黑', 'success');
@@ -257,8 +258,8 @@ export default function FriendsPage() {
               return (
                 <div key={peer.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-100 text-sm font-bold text-primary-600 dark:bg-primary-900/30">
-                      {getDisplayName(peer)[0]?.toUpperCase()}
+                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-primary-100 text-sm font-bold text-primary-600 dark:bg-primary-900/30">
+                      {peer.avatar ? <img src={assetUrl(peer.avatar)} alt="" className="h-full w-full object-cover" /> : getDisplayName(peer)[0]?.toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{getDisplayName(peer)}</p>
@@ -291,8 +292,8 @@ export default function FriendsPage() {
               requests.map(req => (
                 <div key={req.id} className="flex items-center justify-between rounded-xl bg-white p-3 dark:bg-gray-900">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-100 text-sm font-bold text-primary-600">
-                      {getDisplayName(req.from)[0]?.toUpperCase()}
+                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-primary-100 text-sm font-bold text-primary-600">
+                      {req.from.avatar ? <img src={assetUrl(req.from.avatar)} alt="" className="h-full w-full object-cover" /> : getDisplayName(req.from)[0]?.toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200">{getDisplayName(req.from)}</p>
@@ -333,8 +334,8 @@ export default function FriendsPage() {
                     className="flex flex-1 items-center gap-3 cursor-pointer"
                     onClick={() => nav(`/chat/${f.peer.digitalId}`)}
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 text-sm font-bold text-primary-600 dark:bg-primary-900/30">
-                      {getDisplayName(f.peer)[0]?.toUpperCase()}
+                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-primary-100 text-sm font-bold text-primary-600 dark:bg-primary-900/30">
+                      {f.peer.avatar ? <img src={assetUrl(f.peer.avatar)} alt="" className="h-full w-full object-cover" /> : getDisplayName(f.peer)[0]?.toUpperCase()}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200">

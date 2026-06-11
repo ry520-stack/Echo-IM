@@ -2,6 +2,22 @@ import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
 import { canAccessConversation } from './messagePermission.service';
 
+async function getBlockedByMeMap(userId: string, peerIds?: string[]) {
+  const blocks = await prisma.blockList.findMany({
+    where: {
+      blockerId: userId,
+      ...(peerIds?.length ? { blockedId: { in: peerIds } } : {}),
+    },
+    select: { blockedId: true, createdAt: true },
+  });
+  return new Map(blocks.map(block => [block.blockedId, block.createdAt]));
+}
+
+function isHiddenByActiveBlock(message: { senderId: string; createdAt: Date }, blockedByMe: Map<string, Date>) {
+  const blockedAt = blockedByMe.get(message.senderId);
+  return !!blockedAt && message.createdAt > blockedAt;
+}
+
 export async function getMessages(
   userId: string,
   peerId: string,
@@ -24,6 +40,7 @@ export async function getMessages(
     select: { messageId: true },
   });
   const hiddenSet = new Set(hiddenIds.map(h => h.messageId));
+  const blockedByMe = await getBlockedByMeMap(userId, [peerId]);
 
   const messages = await prisma.message.findMany({
     where: {
@@ -47,6 +64,7 @@ export async function getMessages(
   // Filter out hidden messages and those before conversation clear
   const filtered = messages.filter(m => {
     if (hiddenSet.has(m.id)) return false;
+    if (isHiddenByActiveBlock(m, blockedByMe)) return false;
     if (clearRecord && m.createdAt <= clearRecord.clearedAt) return false;
     return true;
   });
@@ -144,42 +162,23 @@ export async function getConversations(userId: string) {
 
   let peerIds = Array.from(peerMap.keys());
   if (peerIds.length > 0) {
-    const [blocks, relations] = await Promise.all([
-      prisma.blockList.findMany({
-        where: {
-          OR: [
-            { blockerId: userId, blockedId: { in: peerIds } },
-            { blockerId: { in: peerIds }, blockedId: userId },
-          ],
-        },
-      }),
-      prisma.friend.findMany({
-        where: {
-          OR: [
-            { userId, friendId: { in: peerIds } },
-            { userId: { in: peerIds }, friendId: userId },
-          ],
-        },
-      }),
-    ]);
-
-    const blockedPeerIds = new Set<string>();
-    for (const b of blocks) {
-      blockedPeerIds.add(b.blockerId === userId ? b.blockedId : b.blockerId);
-    }
+    const relations = await prisma.friend.findMany({
+      where: {
+        OR: [
+          { userId, friendId: { in: peerIds } },
+          { userId: { in: peerIds }, friendId: userId },
+        ],
+      },
+    });
 
     const deletedByPeerIds = new Set<string>();
     for (const r of relations) {
-      if (r.status === 'blocked') {
-        const peerId = r.userId === userId ? r.friendId : r.userId;
-        blockedPeerIds.add(peerId);
-      }
       if (r.status === 'deleted' && r.deletedBy !== userId) {
         const peerId = r.userId === userId ? r.friendId : r.userId;
         deletedByPeerIds.add(peerId);
       }
     }
-    peerIds = peerIds.filter(id => !blockedPeerIds.has(id) && !deletedByPeerIds.has(id));
+    peerIds = peerIds.filter(id => !deletedByPeerIds.has(id));
   }
 
   const conversations: any[] = [];
@@ -210,14 +209,20 @@ export async function getConversations(userId: string) {
       if (f.alias) aliasMap.set(peerId, f.alias);
     }
     const userClearMap = new Map(allUserClears.map(c => [c.peerId, c.clearedAt]));
+    const blockedByMe = await getBlockedByMeMap(userId, peerIds);
 
     const userConversations = await Promise.all(peers.map(async (peer) => {
       const clearTime = userClearMap.get(peer.id);
+      const blockedAt = blockedByMe.get(peer.id);
       const lastMsg = await prisma.message.findFirst({
         where: {
           OR: [
             { senderId: userId, receiverId: peer.id },
-            { senderId: peer.id, receiverId: userId },
+            {
+              senderId: peer.id,
+              receiverId: userId,
+              ...(blockedAt ? { createdAt: { lte: blockedAt } } : {}),
+            },
           ],
           ...(clearTime ? { createdAt: { gt: clearTime } } : {}),
           id: { notIn: [...hiddenSet] },
@@ -232,6 +237,7 @@ export async function getConversations(userId: string) {
           senderId: peer.id,
           receiverId: userId,
           isRecalled: false,
+          ...(blockedAt ? { createdAt: { lte: blockedAt } } : {}),
           ...(clearTime ? { createdAt: { gt: clearTime } } : {}),
           id: { notIn: [...hiddenSet] },
           NOT: { readReceipts: { some: { userId } } },
@@ -430,7 +436,7 @@ export async function searchMessages(
     if (message.groupId) return [];
     return [message.senderId === userId ? message.receiverId : message.senderId].filter((id): id is string => !!id);
   }))];
-  const [peerAccess, userClears, groupClears] = await Promise.all([
+  const [peerAccess, userClears, groupClears, blockedByMe] = await Promise.all([
     Promise.all(privatePeerIds.map(async peerId => ({
       peerId,
       allowed: await canAccessConversation(userId, peerId),
@@ -447,6 +453,7 @@ export async function searchMessages(
           select: { groupId: true, clearedAt: true },
         })
       : Promise.resolve([]),
+    getBlockedByMeMap(userId, privatePeerIds),
   ]);
   const accessiblePrivatePeers = new Set(peerAccess.filter(item => item.allowed).map(item => item.peerId));
   const userClearMap = new Map(userClears.map(item => [item.peerId, item.clearedAt]));
@@ -461,6 +468,7 @@ export async function searchMessages(
     }
     const peerId = message.senderId === userId ? message.receiverId : message.senderId;
     if (!peerId || !accessiblePrivatePeers.has(peerId)) return false;
+    if (isHiddenByActiveBlock(message, blockedByMe)) return false;
     const clearedAt = userClearMap.get(peerId);
     return !clearedAt || message.createdAt > clearedAt;
   });
@@ -478,7 +486,7 @@ export async function getMessageContext(userId: string, messageId: string, radiu
     throw new Error('No permission to access this conversation');
   }
 
-  const [hiddenIds, userClear, groupClear] = await Promise.all([
+  const [hiddenIds, userClear, groupClear, blockedByMe] = await Promise.all([
     prisma.messageHidden.findMany({ where: { userId }, select: { messageId: true } }),
     peerId
       ? prisma.userConversationClear.findUnique({ where: { userId_peerId: { userId, peerId } }, select: { clearedAt: true } })
@@ -486,10 +494,11 @@ export async function getMessageContext(userId: string, messageId: string, radiu
     target.groupId
       ? prisma.groupConversationClear.findUnique({ where: { userId_groupId: { userId, groupId: target.groupId } }, select: { clearedAt: true } })
       : Promise.resolve(null),
+    peerId ? getBlockedByMeMap(userId, [peerId]) : Promise.resolve(new Map<string, Date>()),
   ]);
   const hiddenSet = new Set(hiddenIds.map(item => item.messageId));
   const clearedAt = userClear?.clearedAt || groupClear?.clearedAt;
-  if (hiddenSet.has(target.id) || (clearedAt && target.createdAt <= clearedAt)) {
+  if (hiddenSet.has(target.id) || isHiddenByActiveBlock(target, blockedByMe) || (clearedAt && target.createdAt <= clearedAt)) {
     throw new Error('Message is no longer available');
   }
 
@@ -525,6 +534,7 @@ export async function getMessageContext(userId: string, messageId: string, radiu
 
   return [...beforeAndTarget.reverse(), ...after].filter(message => {
     if (hiddenSet.has(message.id)) return false;
+    if (isHiddenByActiveBlock(message, blockedByMe)) return false;
     return !clearedAt || message.createdAt > clearedAt;
   });
 }

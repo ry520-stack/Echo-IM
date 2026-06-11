@@ -221,12 +221,17 @@ export function initSocket(httpServer: HttpServer) {
 
         if (msg) {
           if (data.receiverId) {
-            socket.to(`user:${data.receiverId}`).emit('message:receive', msg);
-            pushOfflineMessage({
-              receiverIds: [data.receiverId],
-              senderName: msg.sender.nickname || msg.sender.username,
-              message: msg,
+            const receiverBlockedSender = await prisma.blockList.findUnique({
+              where: { blockerId_blockedId: { blockerId: data.receiverId, blockedId: userId } },
             });
+            if (!receiverBlockedSender) {
+              socket.to(`user:${data.receiverId}`).emit('message:receive', msg);
+              pushOfflineMessage({
+                receiverIds: [data.receiverId],
+                senderName: msg.sender.nickname || msg.sender.username,
+                message: msg,
+              });
+            }
           } else if (data.groupId) {
             socket.to(`group:${data.groupId}`).emit('message:receive', msg);
             const members = await prisma.groupMember.findMany({

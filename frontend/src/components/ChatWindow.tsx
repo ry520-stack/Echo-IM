@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, Clock, Send, Smile, Trash2, PawPrint, Camera, Cookie, Backpack, Store, Heart, Gift, Sparkles, ShowerHead, Dumbbell, Compass, Footprints, Brush, Shield, Music, BookOpen, Briefcase } from 'lucide-react';
@@ -201,8 +202,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   useEffect(() => {
     if (!socket || isGroup) return;
     const handleRelationshipUpdated = (data: { action?: string; peerId?: string }) => {
-      if (data.peerId !== realPeerId || !['blocked', 'removed'].includes(data.action || '')) return;
-      toast(data.action === 'blocked' ? '\u8be5\u79c1\u804a\u5df2\u56e0\u62c9\u9ed1\u5173\u7cfb\u5173\u95ed' : '\u4f60\u4eec\u5df2\u4e0d\u662f\u597d\u53cb', 'error');
+      if (data.peerId !== realPeerId || data.action !== 'removed') return;
+      toast('\u4f60\u4eec\u5df2\u4e0d\u662f\u597d\u53cb', 'error');
       onBack?.();
     };
     socket.on('relationship:updated', handleRelationshipUpdated);
@@ -1242,6 +1243,29 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatTimeDivider = (iso: string) => {
+    const date = new Date(iso);
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const prefix = sameDay
+      ? '今天'
+      : date.toDateString() === yesterday.toDateString()
+        ? '昨天'
+        : date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+    return `${prefix} ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+  };
+
+  const shouldShowTimeDivider = (msg: Message, index: number) => {
+    if (index === 0) return true;
+    const prev = messages[index - 1];
+    const currentTime = new Date(msg.createdAt).getTime();
+    const previousTime = new Date(prev.createdAt).getTime();
+    const crossDay = new Date(msg.createdAt).toDateString() !== new Date(prev.createdAt).toDateString();
+    return crossDay || currentTime - previousTime >= 10 * 60 * 1000;
+  };
+
   const isRead = (msg: Message) => {
     // Symmetric: both users must have receipts enabled
     if (!readReceiptOn) return false;
@@ -1480,7 +1504,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           isGroup ? 'bg-emerald-500' : 'bg-primary-500'
         }`}>
           {isGroup ? (liveGroupAvatar ? <img src={assetUrl(liveGroupAvatar)} alt="" className="h-full w-full rounded-xl object-cover" /> : (liveGroupName?.[0]?.toUpperCase() || 'G')) : (
-            peer?.avatar ? <img src={assetUrl(peer.avatar)} alt="" className="h-full w-full rounded-xl object-cover" /> :
+            peer?.avatar ? <img src={assetUrl(peer.avatar)} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} className="h-full w-full rounded-xl object-cover" /> :
             getPeerName()[0]?.toUpperCase() || '?'
           )}
         </button>
@@ -1541,12 +1565,25 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           </div>
         ) : (
           <div className="px-3 py-3 space-y-2 relative z-[1] min-h-full">
-            {messages.map((msg) => {
+            {messages.map((msg, index) => {
               const isMine = msg.senderId === user?.id;
               const isMediaMessage = msg.type === 'image' || msg.type === 'video';
+              const timeDivider = shouldShowTimeDivider(msg, index) ? (
+                <div key={`${msg.id}-time`} className="my-4 flex justify-center">
+                  <span className="rounded-full bg-black/5 px-3 py-1 text-[11px] font-medium text-gray-400 dark:bg-white/10 dark:text-gray-500">
+                    {formatTimeDivider(msg.createdAt)}
+                  </span>
+                </div>
+              ) : null;
+              const withTimeDivider = (node: ReactNode) => (
+                <>
+                  {timeDivider}
+                  {node}
+                </>
+              );
 
               if (msg.type === 'pet') {
-                return (
+                return withTimeDivider(
                   <div key={msg.id} className="flex items-end gap-1.5 ml-1 msg-in">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-amber-100 text-sm font-bold text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
                       {pet?.avatar
@@ -1572,7 +1609,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   : event === 'rejected'
                     ? '共同领养邀请已被拒绝'
                     : msg.senderId === user?.id ? '你发起了共同领养邀请' : '对方申请共同领养宠物';
-                return (
+                return withTimeDivider(
                   <div key={msg.id} className="mx-auto my-2 w-[92%] rounded-2xl border border-amber-200 bg-amber-50/95 p-3 text-amber-800 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
                     <p className="text-xs font-semibold">共同宠物</p>
                     <p className="mt-1 text-sm">{text}</p>
@@ -1586,7 +1623,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                 );
               }
 
-              return (
+              return withTimeDivider(
                 <div
                   key={msg.id}
                   id={`message-${msg.id}`}
@@ -1631,14 +1668,6 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           : getSenderDisplayName(msg)[0]?.toUpperCase() || '?'}
                       </div>
                     )}
-                    {!isMine && msg.isRecalled && (
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gray-300 text-sm font-bold text-gray-500 dark:bg-gray-700 grayscale opacity-50">
-                        {getSenderAvatar(msg)
-                          ? <img src={assetUrl(getSenderAvatar(msg)!)} alt="" className="h-full w-full object-cover" />
-                          : getSenderDisplayName(msg)[0]?.toUpperCase() || '?'}
-                      </div>
-                    )}
-
                     <div className="min-w-0">
                       {isGroup && !isMine && !msg.isRecalled && (
                         <p className="mb-0.5 text-[10px] text-primary-400 ml-1">

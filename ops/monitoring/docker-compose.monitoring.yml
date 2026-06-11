@@ -74,6 +74,24 @@ services:
     depends_on:
       - prometheus
 
+  grafana-demo-user:
+    image: curlimages/curl:8.8.0
+    container_name: echo-grafana-demo-user
+    restart: 'no'
+    environment:
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GRAFANA_DEMO_USER: ${GRAFANA_DEMO_USER:-demo}
+      GRAFANA_DEMO_PASSWORD: ${GRAFANA_DEMO_PASSWORD:-echo2026}
+    volumes:
+      - ./scripts/create-demo-user.sh:/create-demo-user.sh:ro
+    entrypoint: ['/bin/sh', '/create-demo-user.sh']
+    networks:
+      - monitoring_net
+    depends_on:
+      - grafana
+
   # ──────────────────────────────────────────────
   # Node Exporter - Linux 主机指标采集
   # 采集 CPU、内存、磁盘、网络等内核级指标

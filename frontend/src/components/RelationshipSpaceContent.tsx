@@ -14,11 +14,10 @@ import {
   Siren,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { api } from '../api/client';
+import { api, getServerUrl } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { useToast } from '../contexts/ToastContext';
-import { compressImage } from '../utils/compressImage';
 import { assetUrl } from '../utils/assetUrl';
 
 interface FriendItem {
@@ -104,10 +103,7 @@ const CITY_COORDS: Record<string, { lat: number; lon: number; city: string }> = 
   沈北新区: { lat: 41.9131, lon: 123.5264, city: '沈北新区' },
 };
 const SONG_KEY = 'echo-couple-songs';
-const PRAISE_KEY = 'echo-couple-praise-book';
-const LEDGER_KEY = 'echo-couple-ledger-book';
-
-type FeaturePage = 'songs' | 'praise' | 'ledger' | null;
+type FeaturePage = 'songs' | 'praise' | 'ledger' | 'diary' | null;
 
 type CachedWeather = Record<string, { day: string; value: Weather | null }>;
 
@@ -122,15 +118,29 @@ interface SongItem {
 
 interface CoupleBookEntry {
   id: string;
-  type: 'praise' | 'ledger';
+  type: 'praise' | 'ledger' | 'diary';
   createdBy: string;
   targetId: string;
   time: string;
   location: string;
   reason: string;
   mood: string;
+  media?: string[];
+  visibility?: 'private' | 'partner';
   apology?: string;
   status: 'open' | 'forgive_requested' | 'forgiven' | 'rejected';
+  createdAt: string;
+}
+
+interface CoupleItemDto {
+  id: string;
+  createdBy: string;
+  type: string;
+  title: string;
+  content: string;
+  images: string;
+  cityName: string;
+  happenedAt?: string | null;
   createdAt: string;
 }
 
@@ -313,6 +323,48 @@ function readImageSize(url: string) {
     img.onerror = () => resolve({ width: 1, height: 1 });
     img.src = url;
   });
+}
+
+function parseJsonSafe<T>(value: string | undefined, fallback: T): T {
+  try {
+    return JSON.parse(value || '') as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function uploadCoupleMedia(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = localStorage.getItem('echo-token');
+  const endpoint = file.type.startsWith('video/') ? '/api/upload/video' : '/api/upload/chat-image';
+  const res = await fetch(`${getServerUrl()}${endpoint}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || '上传失败');
+  return String(data.url || '');
+}
+
+function itemToBookEntry(item: CoupleItemDto): CoupleBookEntry {
+  const data = parseJsonSafe<Partial<CoupleBookEntry>>(item.content, {});
+  return {
+    id: item.id,
+    type: item.type as CoupleBookEntry['type'],
+    createdBy: item.createdBy,
+    targetId: data.targetId || '',
+    time: item.happenedAt?.slice(0, 10) || data.time || item.createdAt.slice(0, 10),
+    location: item.cityName || data.location || '',
+    reason: data.reason || item.title || '',
+    mood: data.mood || '',
+    media: parseJsonSafe<string[]>(item.images, data.media || []),
+    visibility: data.visibility || 'partner',
+    apology: data.apology || '',
+    status: data.status || 'open',
+    createdAt: item.createdAt,
+  };
 }
 
 export default function RelationshipSpaceContent({
@@ -509,10 +561,11 @@ export default function RelationshipSpaceContent({
           <WeatherCard title="对方天气" city={getPeerCity(space)} weather={peerWeather} />
         </section>
 
-        <section className="grid grid-cols-3 gap-3">
+        <section className="grid grid-cols-4 gap-3">
           <QuietFeature icon={MessageCircleHeart} title="夸夸本" onClick={() => setFeaturePage('praise')} />
-          <QuietFeature icon={Heart} title="记账本" onClick={() => setFeaturePage('ledger')} />
+          <QuietFeature icon={Heart} title="记仇本" onClick={() => setFeaturePage('ledger')} />
           <QuietFeature icon={Music2} title="情歌" onClick={() => setFeaturePage('songs')} />
+          <QuietFeature icon={Save} title="日记" onClick={() => setFeaturePage('diary')} />
         </section>
 
         <button onClick={sos} className="flex w-full items-center justify-center gap-2 rounded-[24px] bg-red-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-red-500/20">
@@ -690,27 +743,58 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
   const previewPhoto = previewGroup && previewIndex >= 0 ? previewGroup.photos[previewIndex] : null;
   const albumTitle = ALBUM_TITLES[albumType];
 
+  const loadCurrentGroups = useCallback(async (type: AlbumType = albumType) => {
+    if (type === 'couple') {
+      const remote = await api<AlbumGroup[]>('GET', '/api/couples/album/groups').catch(() => []);
+      setGroups(remote);
+      return;
+    }
+    setGroups(loadAlbumGroups(type));
+  }, [albumType]);
+
   const syncGroups = (next: AlbumGroup[]) => {
     setGroups(next);
     saveAlbumGroups(albumType, next);
   };
 
+  const uploadAlbumFile = async (file: File): Promise<AlbumPhoto> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('echo-token');
+    const res = await fetch(`${getServerUrl()}/api/upload/chat-image`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || '上传失败');
+    const size = await readImageSize(assetUrl(data.url));
+    return {
+      id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      url: data.url,
+      createdAt: new Date().toISOString(),
+      width: size.width,
+      height: size.height,
+      description,
+    };
+  };
+
   useEffect(() => {
-    setGroups(loadAlbumGroups(albumType));
+    loadCurrentGroups(albumType);
     setSelectedGroupId('');
     setSelectedPhotoIds(new Set());
     setManaging(false);
     setPreview(null);
-  }, [albumType]);
+  }, [albumType, loadCurrentGroups]);
 
   useEffect(() => {
     const refresh = (event: Event) => {
       const detail = (event as CustomEvent<{ type?: AlbumType }>).detail;
-      if (!detail?.type || detail.type === albumType) setGroups(loadAlbumGroups(albumType));
+      if (!detail?.type || detail.type === albumType) loadCurrentGroups(albumType);
     };
     window.addEventListener('echo-album-updated', refresh);
     return () => window.removeEventListener('echo-album-updated', refresh);
-  }, [albumType]);
+  }, [albumType, loadCurrentGroups]);
 
   const openUpload = (groupId = '') => {
     setTargetGroupId(groupId || groups[0]?.id || '');
@@ -740,71 +824,112 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
     }
 
     setSaving(true);
-    const photos: AlbumPhoto[] = [];
-    for (const file of pendingFiles) {
-      const prepared = await compressImage(file, 0.8);
-      const url = await fileToDataUrl(prepared);
-      const size = await readImageSize(url);
-      photos.push({
-        id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        url,
-        createdAt: new Date().toISOString(),
-        width: size.width,
-        height: size.height,
-        description,
-      });
-    }
-
-    let nextGroups: AlbumGroup[];
-    if (groupMode === 'new') {
-      const group: AlbumGroup = {
-        id: `group_${Date.now()}`,
-        title: title.trim(),
-        date,
-        location,
-        description,
-        coverUrl: cover ? photos[0]?.url || '' : '',
-        photos,
-      };
-      nextGroups = [group, ...groups];
-      setSelectedGroupId(group.id);
-    } else {
-      nextGroups = groups.map(group => group.id === targetGroupId
-        ? {
-          ...group,
-          date: date || group.date,
-          location: location || group.location,
-          description: description || group.description,
-          coverUrl: cover ? photos[0]?.url || group.coverUrl : group.coverUrl,
-          photos: [...photos, ...group.photos],
-        }
-        : group);
-    }
-
     try {
-      syncGroups(nextGroups);
+      const photos: AlbumPhoto[] = [];
+      for (const file of pendingFiles) {
+        if (albumType === 'couple') {
+          photos.push(await uploadAlbumFile(file));
+        } else {
+          const url = await fileToDataUrl(file);
+          const size = await readImageSize(url);
+          photos.push({
+            id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            url,
+            createdAt: new Date().toISOString(),
+            width: size.width,
+            height: size.height,
+            description,
+          });
+        }
+      }
+
+      if (albumType === 'couple') {
+        if (groupMode === 'new') {
+          const group = await api<AlbumGroup>('POST', '/api/couples/album/groups', {
+            title: title.trim(),
+            date,
+            location,
+            description,
+            coverUrl: cover ? photos[0]?.url || '' : '',
+            photos,
+          });
+          setSelectedGroupId(group.id);
+        } else {
+          await api<AlbumGroup>('PATCH', `/api/couples/album/groups/${targetGroupId}`, {
+            date,
+            location,
+            description,
+            coverUrl: cover ? photos[0]?.url || '' : undefined,
+          });
+          await api<AlbumGroup>('POST', `/api/couples/album/groups/${targetGroupId}/photos`, { photos });
+        }
+        await loadCurrentGroups('couple');
+      } else {
+        let nextGroups: AlbumGroup[];
+        if (groupMode === 'new') {
+          const group: AlbumGroup = {
+            id: `group_${Date.now()}`,
+            title: title.trim(),
+            date,
+            location,
+            description,
+            coverUrl: cover ? photos[0]?.url || '' : '',
+            photos,
+          };
+          nextGroups = [group, ...groups];
+          setSelectedGroupId(group.id);
+        } else {
+          nextGroups = groups.map(group => group.id === targetGroupId
+            ? {
+              ...group,
+              date: date || group.date,
+              location: location || group.location,
+              description: description || group.description,
+              coverUrl: cover ? photos[0]?.url || group.coverUrl : group.coverUrl,
+              photos: [...photos, ...group.photos],
+            }
+            : group);
+        }
+        syncGroups(nextGroups);
+      }
       setPendingFiles([]);
       setFormOpen(false);
       setCover(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
       toast('照片已保存', 'success');
-    } catch {
-      toast('照片太大，保存失败，请换一张较小的图片', 'error');
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : '照片保存失败', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const updateGroup = (groupId: string, patch: Partial<AlbumGroup>) => {
+  const updateGroup = async (groupId: string, patch: Partial<AlbumGroup>) => {
+    if (albumType === 'couple') {
+      const updated = await api<AlbumGroup>('PATCH', `/api/couples/album/groups/${groupId}`, patch).catch((e: Error) => {
+        toast(e.message || '保存失败', 'error');
+        return null;
+      });
+      if (updated) setGroups(prev => prev.map(group => group.id === groupId ? updated : group));
+      return;
+    }
     syncGroups(groups.map(group => group.id === groupId ? { ...group, ...patch } : group));
   };
 
-  const deleteGroup = (groupId: string) => {
+  const deleteGroup = async (groupId: string) => {
     const group = groups.find(item => item.id === groupId);
     if (!group) return;
     const ok = window.confirm(`删除「${group.title}」标签？里面的照片也会一起删除。`);
     if (!ok) return;
-    syncGroups(groups.filter(item => item.id !== groupId));
+    if (albumType === 'couple') {
+      await api('DELETE', `/api/couples/album/groups/${groupId}`).catch((e: Error) => {
+        toast(e.message || '删除失败', 'error');
+        return null;
+      });
+      await loadCurrentGroups('couple');
+    } else {
+      syncGroups(groups.filter(item => item.id !== groupId));
+    }
     setSelectedGroupId('');
     setSelectedPhotoIds(new Set());
     setManaging(false);
@@ -814,6 +939,17 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
 
   const deleteSelected = () => {
     if (!activeGroup || selectedPhotoIds.size === 0) return;
+    if (albumType === 'couple') {
+      api<AlbumGroup>('DELETE', `/api/couples/album/groups/${activeGroup.id}/photos`, { photoIds: [...selectedPhotoIds] })
+        .then(updated => {
+          setGroups(prev => prev.map(group => group.id === activeGroup.id ? updated : group));
+          setSelectedPhotoIds(new Set());
+          setManaging(false);
+          toast('已删除选中照片', 'success');
+        })
+        .catch((e: Error) => toast(e.message || '删除失败', 'error'));
+      return;
+    }
     const next = groups.map(group => group.id === activeGroup.id
       ? { ...group, photos: group.photos.filter(photo => !selectedPhotoIds.has(photo.id)) }
       : group);
@@ -987,6 +1123,9 @@ function CoupleFeaturePage({ type, space, currentUserId, onBack }: { type: Exclu
   if (type === 'songs') {
     return <SongBookPage onBack={onBack} />;
   }
+  if (type === 'diary') {
+    return <DiaryPage currentUserId={currentUserId} onBack={onBack} />;
+  }
   return <CoupleBookPage type={type} space={space} currentUserId={currentUserId} onBack={onBack} />;
 }
 
@@ -1062,26 +1201,57 @@ function SongBookPage({ onBack }: { onBack: () => void }) {
 }
 
 function CoupleBookPage({ type, space, currentUserId, onBack }: { type: 'praise' | 'ledger'; space: CoupleSpace; currentUserId: string; onBack: () => void }) {
-  const storageKey = type === 'praise' ? PRAISE_KEY : LEDGER_KEY;
-  const [entries, setEntries] = useState<CoupleBookEntry[]>(() => loadList<CoupleBookEntry>(storageKey));
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [entries, setEntries] = useState<CoupleBookEntry[]>([]);
   const [time, setTime] = useState(() => new Date().toISOString().slice(0, 10));
   const [location, setLocation] = useState(DEFAULT_PEER_CITY);
   const [reason, setReason] = useState('');
   const [mood, setMood] = useState('');
   const [apology, setApology] = useState('');
+  const [media, setMedia] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const visibleEntries = entries.filter(entry => entry.status !== 'rejected');
-  const title = type === 'praise' ? '夸夸本' : '记账本';
+  const title = type === 'praise' ? '夸夸本' : '记仇本';
   const peerName = display(space.peer);
 
-  const sync = (next: CoupleBookEntry[]) => {
-    setEntries(next);
-    saveList(storageKey, next);
+  const refresh = useCallback(() => {
+    api<CoupleItemDto[]>('GET', `/api/couples/items?type=${type}`)
+      .then(items => setEntries(items.map(itemToBookEntry)))
+      .catch(() => setEntries([]));
+  }, [type]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const contentOf = (entry: Partial<CoupleBookEntry>) => JSON.stringify({
+    targetId: entry.targetId,
+    time: entry.time,
+    location: entry.location,
+    reason: entry.reason,
+    mood: entry.mood,
+    apology: entry.apology || '',
+    status: entry.status || 'open',
+    visibility: 'partner',
+  });
+
+  const pickMedia = async (files: FileList | null) => {
+    const selected = Array.from(files || []).filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'));
+    if (!selected.length) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of selected) urls.push(await uploadCoupleMedia(file));
+      setMedia(prev => [...prev, ...urls]);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : '上传失败');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
-  const createEntry = () => {
+  const createEntry = async () => {
     if (!reason.trim()) return;
-    sync([{
-      id: `${type}_${Date.now()}`,
+    const entry: Partial<CoupleBookEntry> = {
       type,
       createdBy: currentUserId || 'me',
       targetId: space.peer.id,
@@ -1089,23 +1259,46 @@ function CoupleBookPage({ type, space, currentUserId, onBack }: { type: 'praise'
       location,
       reason: reason.trim(),
       mood: mood.trim(),
+      media,
       status: 'open',
       createdAt: new Date().toISOString(),
-    }, ...entries]);
+    };
+    const created = await api<CoupleItemDto>('POST', '/api/couples/items', {
+      type,
+      title: reason.trim(),
+      content: contentOf(entry),
+      images: media,
+      location,
+      time,
+    });
+    setEntries(prev => [itemToBookEntry(created), ...prev]);
     setReason('');
     setMood('');
+    setMedia([]);
   };
 
-  const patchEntry = (id: string, patch: Partial<CoupleBookEntry>) => {
-    sync(entries.map(entry => entry.id === id ? { ...entry, ...patch } : entry));
+  const patchEntry = async (id: string, patch: Partial<CoupleBookEntry>) => {
+    const current = entries.find(entry => entry.id === id);
+    if (!current) return;
+    const next = { ...current, ...patch };
+    const updated = await api<CoupleItemDto>('PATCH', `/api/couples/items/${id}`, {
+      title: next.reason,
+      content: contentOf(next),
+      images: next.media || [],
+      location: next.location,
+      time: next.time,
+    });
+    setEntries(prev => prev.map(entry => entry.id === id ? itemToBookEntry(updated) : entry));
   };
 
-  const deleteEntry = (id: string) => {
-    sync(entries.filter(entry => entry.id !== id));
+  const deleteEntry = async (id: string) => {
+    await api('DELETE', `/api/couples/items/${id}`);
+    setEntries(prev => prev.filter(entry => entry.id !== id));
   };
 
   return (
     <div className="h-full overflow-y-auto bg-[#f6f5fb] px-4 pb-7 pt-4 dark:bg-gray-950">
+      <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => pickMedia(e.target.files)} />
       <FeatureHeader title={title} onBack={onBack} />
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
         <div className="grid grid-cols-2 gap-2">
@@ -1114,6 +1307,8 @@ function CoupleBookPage({ type, space, currentUserId, onBack }: { type: 'praise'
         </div>
         <Field label={type === 'praise' ? '夸夸原因' : '记账原因'}><textarea value={reason} onChange={e => setReason(e.target.value)} className="form-input min-h-[76px] resize-none" placeholder={type === 'praise' ? `今天想夸夸${peerName}` : `今天给${peerName}记一笔`} /></Field>
         <Field label="心情"><input value={mood} onChange={e => setMood(e.target.value)} className="form-input" placeholder="开心 / 委屈 / 生气 / 想抱抱" /></Field>
+        <MediaPreview media={media} onRemove={url => setMedia(prev => prev.filter(item => item !== url))} />
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="mt-3 rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 disabled:opacity-60 dark:bg-gray-800 dark:text-gray-300">{uploading ? '上传中...' : '添加图片/视频'}</button>
         <button onClick={createEntry} className="mt-3 w-full rounded-xl bg-rose-500 py-3 text-sm font-bold text-white">创建{title}</button>
       </section>
       <section className="mt-4 space-y-3">
@@ -1128,6 +1323,7 @@ function CoupleBookPage({ type, space, currentUserId, onBack }: { type: 'praise'
                 </div>
                 <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-800">{entry.status === 'forgiven' ? '已原谅' : entry.status === 'forgive_requested' ? '待处理' : '进行中'}</span>
               </div>
+              <MediaPreview media={entry.media || []} readonly />
               {entry.apology && <p className="mt-3 rounded-2xl bg-rose-50 px-3 py-2 text-sm text-rose-600 dark:bg-rose-950/20">{entry.apology}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 {!mine && entry.status === 'open' && (
@@ -1149,6 +1345,118 @@ function CoupleBookPage({ type, space, currentUserId, onBack }: { type: 'praise'
         })}
         {!visibleEntries.length && <SoftEmpty title={`还没有${title}`} text="创建一条属于你们的小记录" />}
       </section>
+    </div>
+  );
+}
+
+function DiaryPage({ currentUserId, onBack }: { currentUserId: string; onBack: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [entries, setEntries] = useState<CoupleBookEntry[]>([]);
+  const [content, setContent] = useState('');
+  const [mood, setMood] = useState('');
+  const [visibility, setVisibility] = useState<'private' | 'partner'>('partner');
+  const [media, setMedia] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const refresh = useCallback(() => {
+    api<CoupleItemDto[]>('GET', '/api/couples/items?type=diary')
+      .then(items => setEntries(items.map(itemToBookEntry).filter(entry => entry.visibility !== 'private' || entry.createdBy === currentUserId)))
+      .catch(() => setEntries([]));
+  }, [currentUserId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const pickMedia = async (files: FileList | null) => {
+    const selected = Array.from(files || []).filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'));
+    if (!selected.length) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of selected) urls.push(await uploadCoupleMedia(file));
+      setMedia(prev => [...prev, ...urls]);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const saveDiary = async () => {
+    if (!content.trim() && !media.length) return;
+    const entry: Partial<CoupleBookEntry> = {
+      type: 'diary',
+      createdBy: currentUserId,
+      reason: content.trim(),
+      mood: mood.trim(),
+      media,
+      visibility,
+      status: 'open',
+      time: new Date().toISOString().slice(0, 10),
+    };
+    const created = await api<CoupleItemDto>('POST', '/api/couples/items', {
+      type: 'diary',
+      title: content.trim().slice(0, 40) || '日记',
+      content: JSON.stringify(entry),
+      images: media,
+      time: entry.time,
+    });
+    setEntries(prev => [itemToBookEntry(created), ...prev]);
+    setContent('');
+    setMood('');
+    setMedia([]);
+  };
+
+  const deleteDiary = async (id: string) => {
+    await api('DELETE', `/api/couples/items/${id}`);
+    setEntries(prev => prev.filter(entry => entry.id !== id));
+  };
+
+  return (
+    <div className="h-full overflow-y-auto bg-[#f6f5fb] px-4 pb-7 pt-4 dark:bg-gray-950">
+      <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => pickMedia(e.target.files)} />
+      <FeatureHeader title="日记" onBack={onBack} />
+      <section className="mt-4 rounded-[28px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
+        <Field label="今天想写点什么"><textarea value={content} onChange={e => setContent(e.target.value)} className="form-input min-h-[110px] resize-none" placeholder="写一段只属于今天的心情" /></Field>
+        <Field label="心情"><input value={mood} onChange={e => setMood(e.target.value)} className="form-input" placeholder="开心 / 想念 / 难过 / 平静" /></Field>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button onClick={() => setVisibility('partner')} className={`rounded-xl py-2 text-sm font-semibold ${visibility === 'partner' ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>给另一半看</button>
+          <button onClick={() => setVisibility('private')} className={`rounded-xl py-2 text-sm font-semibold ${visibility === 'private' ? 'bg-gray-950 text-white dark:bg-white dark:text-gray-950' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>仅自己可见</button>
+        </div>
+        <MediaPreview media={media} onRemove={url => setMedia(prev => prev.filter(item => item !== url))} />
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="mt-3 rounded-xl bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-600 disabled:opacity-60 dark:bg-gray-800 dark:text-gray-300">{uploading ? '上传中...' : '添加图片/视频'}</button>
+        <button onClick={saveDiary} className="mt-3 w-full rounded-xl bg-rose-500 py-3 text-sm font-bold text-white">保存日记</button>
+      </section>
+      <section className="mt-4 space-y-3">
+        {entries.map(entry => (
+          <article key={entry.id} className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="whitespace-pre-wrap text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">{entry.reason}</p>
+                <p className="mt-1 text-xs text-gray-500">{entry.time} · {entry.mood || '未填写心情'} · {entry.visibility === 'private' ? '仅自己可见' : '双方可见'}</p>
+              </div>
+              {entry.createdBy === currentUserId && <button onClick={() => deleteDiary(entry.id)} className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-500 dark:bg-gray-800">删除</button>}
+            </div>
+            <MediaPreview media={entry.media || []} readonly />
+          </article>
+        ))}
+        {!entries.length && <SoftEmpty title="还没有日记" text="写下第一条今天的心情" />}
+      </section>
+    </div>
+  );
+}
+
+function MediaPreview({ media, onRemove, readonly = false }: { media: string[]; onRemove?: (url: string) => void; readonly?: boolean }) {
+  if (!media.length) return null;
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-2">
+      {media.map(url => {
+        const isVideo = /\.(mp4|mov|m4v|webm)$/i.test(url);
+        return (
+          <div key={url} className="relative overflow-hidden rounded-2xl bg-gray-100 dark:bg-gray-800">
+            {isVideo ? <video src={assetUrl(url)} controls className="h-24 w-full object-cover" /> : <img src={assetUrl(url)} className="h-24 w-full object-cover" />}
+            {!readonly && onRemove && <button onClick={() => onRemove(url)} className="absolute right-1 top-1 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white">删</button>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1277,8 +1585,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Avatar({ peer, large = false }: { peer: FriendItem['peer'] | CoupleSpace['peer']; large?: boolean }) {
+  const [failed, setFailed] = useState(false);
   const size = large ? 'h-16 w-16 rounded-2xl' : 'h-10 w-10 rounded-xl';
-  return peer.avatar
-    ? <img src={assetUrl(peer.avatar)} className={`${size} shrink-0 object-cover`} draggable={false} />
+  return peer.avatar && !failed
+    ? <img src={assetUrl(peer.avatar)} onError={() => setFailed(true)} className={`${size} shrink-0 object-cover`} draggable={false} />
     : <div className={`${size} flex shrink-0 items-center justify-center bg-rose-100 font-bold text-rose-500`}>{display(peer)[0]?.toUpperCase() || '?'}</div>;
 }

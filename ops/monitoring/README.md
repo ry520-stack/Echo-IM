@@ -131,7 +131,7 @@ docker compose -f docker-compose.monitoring.yml logs -f
 
 | 服务 | 地址 | 说明 |
 |------|------|------|
-| Grafana | http://localhost:3000 | 登录：见 `.env` 中的 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
+| Grafana | http://localhost:3000 | 管理员登录见 `.env`；演示账号：`demo` / `echo2026`（Viewer） |
 | Prometheus | http://localhost:9091 | 指标查询界面 |
 | Alertmanager | http://localhost:9093 | 告警管理界面 |
 | cAdvisor | http://localhost:8085 | 容器详情界面 |

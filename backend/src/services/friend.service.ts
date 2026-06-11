@@ -73,6 +73,7 @@ export async function getFriends(userId: string) {
         {
           OR: [
             { status: 'accepted' },
+            { status: 'blocked' },
             { status: 'deleted', deletedBy: { not: userId } },
           ],
         },
@@ -102,7 +103,7 @@ export async function getFriends(userId: string) {
 async function findAcceptedRelation(userId: string, peerId: string) {
   const relation = await prisma.friend.findFirst({
     where: {
-      status: 'accepted',
+      status: { in: ['accepted', 'blocked'] },
       OR: [
         { userId, friendId: peerId },
         { userId: peerId, friendId: userId },
