@@ -358,6 +358,7 @@ export function initSocket(httpServer: HttpServer) {
       if (idx !== -1) {
         onlineUsers.splice(idx, 1);
         io?.emit('online:update', { userId, online: false });
+        prisma.user.update({ where: { id: userId }, data: { lastSeenAt: new Date() } }).catch(() => {});
       }
     });
   });

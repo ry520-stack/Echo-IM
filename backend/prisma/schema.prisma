@@ -316,6 +316,117 @@ model AlbumPhoto {
   @@index([groupId])
 }
 
+model GameWallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Int      @default(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model GameCoinTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  coupleId    String?
+  amount      Int
+  type        String
+  source      String   @default("")
+  description String   @default("")
+  refType     String   @default("")
+  refId       String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([coupleId, createdAt])
+  @@index([refType, refId])
+}
+
+model CoupleLeisureHome {
+  id           String   @id @default(uuid())
+  coupleId     String   @unique
+  level        Int      @default(1)
+  theme        String   @default("warm")
+  comfortScore Int      @default(0)
+  cleanliness  Int      @default(100)
+  backgroundId String   @default("")
+  wallpaperId  String   @default("")
+  floorId      String   @default("")
+  layoutJson   String   @default("{}")
+  frozen       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([coupleId])
+}
+
+model FurnitureCatalog {
+  id           String   @id @default(uuid())
+  name         String
+  type         String
+  rarity       String   @default("common")
+  price        Int      @default(0)
+  width        Int      @default(1)
+  height       Int      @default(1)
+  imageUrl     String   @default("")
+  icon         String   @default("")
+  comfortValue Int      @default(0)
+  effectConfig String   @default("{}")
+  isLimited    Boolean  @default(false)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([type])
+  @@index([rarity])
+  @@index([isLimited])
+}
+
+model UserFurnitureInventory {
+  id          String   @id @default(uuid())
+  userId      String
+  furnitureId String
+  quantity    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, furnitureId])
+  @@index([userId])
+  @@index([furnitureId])
+}
+
+model HomePlacedFurniture {
+  id          String   @id @default(uuid())
+  homeId      String
+  userId      String
+  furnitureId String
+  x           Int
+  y           Int
+  rotation    Int      @default(0)
+  layer       Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([homeId])
+  @@index([userId])
+  @@index([furnitureId])
+}
+
+model GameInventoryItem {
+  id        String   @id @default(uuid())
+  userId    String
+  itemType  String
+  itemId    String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, itemType, itemId])
+  @@index([userId])
+}
+
 model Moment {
   id           String             @id @default(uuid())
   userId       String

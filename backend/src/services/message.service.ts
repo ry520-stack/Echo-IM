@@ -246,7 +246,7 @@ export async function getConversations(userId: string) {
 
       return {
         type: 'user',
-        peer: { ...peer, alias: aliasMap.get(peer.id) || '', isGroup: false },
+        peer: { ...peer, alias: aliasMap.get(peer.id) || '', isGroup: false, blockedByMe: !!blockedAt },
         lastMessage: lastMsg,
         unreadCount,
         lastTime: lastMsg.createdAt.toISOString(),

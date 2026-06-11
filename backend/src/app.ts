@@ -19,6 +19,10 @@ import friendGroupRoutes from './routes/friendGroup.routes';
 import pushRoutes from './routes/push.routes';
 import petRoutes from './routes/pet.routes';
 import coupleRoutes from './routes/couple.routes';
+import leisureHomeRoutes from './routes/leisureHome.routes';
+import furnitureRoutes from './routes/furniture.routes';
+import gameWalletRoutes from './routes/gameWallet.routes';
+import gameInventoryRoutes from './routes/gameInventory.routes';
 
 const app = express();
 
@@ -98,6 +102,10 @@ app.use('/api/push', pushRoutes);
 app.use('/api/pets', petRoutes);
 app.use('/api/couple', coupleRoutes);
 app.use('/api/couples', coupleRoutes);
+app.use('/api/leisure-home', leisureHomeRoutes);
+app.use('/api/furniture', furnitureRoutes);
+app.use('/api/game-wallet', gameWalletRoutes);
+app.use('/api/game-inventory', gameInventoryRoutes);
 
 // Multer 文件上传错误处理
 app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

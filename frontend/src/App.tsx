@@ -21,6 +21,10 @@ import EchoRankingsPage from './pages/EchoRankingsPage';
 import NotificationProvider from './components/NotificationProvider';
 import { CallProvider } from './contexts/CallContext';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import LeisureHomePage from './pages/couple/LeisureHomePage';
+import HomeDecoratePage from './pages/couple/HomeDecoratePage';
+import FurnitureShopPage from './pages/couple/FurnitureShopPage';
+import GameInventoryPage from './pages/couple/GameInventoryPage';
 import { is5Plus } from './utils/env';
 
 // 5+ App 物理返回键拦截
@@ -83,6 +87,10 @@ export default function App() {
                   <Route path="/chat/:userId/settings" element={<ChatSettingsPage />} />
                   <Route path="/star-zones" element={<StarZoneManagePage />} />
                   <Route path="/echo-rankings" element={<EchoRankingsPage />} />
+                  <Route path="/couple/leisure-home" element={<LeisureHomePage />} />
+                  <Route path="/couple/leisure-home/decorate" element={<HomeDecoratePage />} />
+                  <Route path="/couple/leisure-home/shop" element={<FurnitureShopPage />} />
+                  <Route path="/couple/leisure-home/inventory" element={<GameInventoryPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

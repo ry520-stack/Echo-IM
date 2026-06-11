@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   CloudSun,
   Heart,
+  Home,
   Images,
   MessageCircleHeart,
   Music2,
@@ -560,6 +561,21 @@ export default function RelationshipSpaceContent({
           <WeatherCard title="我的天气" city={getMyCity(space)} weather={myWeather} />
           <WeatherCard title="对方天气" city={getPeerCity(space)} weather={peerWeather} />
         </section>
+
+        <button
+          type="button"
+          onClick={() => nav('/couple/leisure-home')}
+          className="flex w-full items-center gap-4 rounded-[28px] bg-white p-4 text-left shadow-sm ring-1 ring-black/[0.04] transition active:scale-[0.99] dark:bg-gray-900 dark:ring-white/[0.05]"
+        >
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-rose-400 to-orange-300 text-white shadow-lg shadow-rose-300/30">
+            <Home size={26} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-black text-gray-950 dark:text-gray-50">情侣休闲小屋</span>
+            <span className="mt-1 block truncate text-xs text-gray-500">一起装修我们的小家</span>
+          </span>
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-500 dark:bg-rose-950/20">进入</span>
+        </button>
 
         <section className="grid grid-cols-4 gap-3">
           <QuietFeature icon={MessageCircleHeart} title="夸夸本" onClick={() => setFeaturePage('praise')} />

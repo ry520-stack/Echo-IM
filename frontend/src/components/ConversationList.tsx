@@ -10,7 +10,7 @@ import { assetUrl } from '../utils/assetUrl';
 interface Peer {
   id: string; username: string; nickname: string; avatar: string;
   digitalId: number; lastSeenAt: string; status: string; alias: string;
-  isGroup?: boolean; memberCount?: number;
+  isGroup?: boolean; memberCount?: number; blockedByMe?: boolean;
 }
 interface LastMessage { id: string; content: string; type: string; createdAt: string; senderId: string; }
 interface Conversation { type?: 'user' | 'group'; peer: Peer; lastMessage: LastMessage | null; unreadCount: number; lastTime: string; }
@@ -240,6 +240,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
 
   const getDisplayName = (peer: Peer) => peer.alias || peer.nickname || peer.username;
   const getLastSeenText = (peer: Peer) => {
+    if (peer.blockedByMe) return '';
     if (onlineUsers.has(peer.id)) return '在线';
     if (!peer.lastSeenAt) return '';
     const diff = Date.now() - new Date(peer.lastSeenAt).getTime();
@@ -332,7 +333,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
               .filter(c => !archived.has(c.peer.id) || searchText.trim())
               .map((conv) => {
                 const isActive = chatId === conv.peer.id || (!conv.peer.isGroup && chatId === conv.peer.digitalId.toString());
-                const isOnline = !conv.peer.isGroup && onlineUsers.has(conv.peer.id);
+                const isOnline = !conv.peer.isGroup && !conv.peer.blockedByMe && onlineUsers.has(conv.peer.id);
                 const isPinned = pinned.has(conv.peer.id);
                 const isSwiping = swipeId === conv.peer.id;
                 const streak = conv.peer.isGroup ? 0 : (chatStreaks[conv.peer.id] || 0);
