@@ -25,6 +25,9 @@ import LeisureHomePage from './pages/couple/LeisureHomePage';
 import HomeDecoratePage from './pages/couple/HomeDecoratePage';
 import FurnitureShopPage from './pages/couple/FurnitureShopPage';
 import GameInventoryPage from './pages/couple/GameInventoryPage';
+import CookingPage from './pages/couple/CookingPage';
+import GardenPage from './pages/couple/GardenPage';
+import WorkOrderPage from './pages/couple/WorkOrderPage';
 import { is5Plus } from './utils/env';
 
 // 5+ App 物理返回键拦截
@@ -91,6 +94,9 @@ export default function App() {
                   <Route path="/couple/leisure-home/decorate" element={<HomeDecoratePage />} />
                   <Route path="/couple/leisure-home/shop" element={<FurnitureShopPage />} />
                   <Route path="/couple/leisure-home/inventory" element={<GameInventoryPage />} />
+                  <Route path="/couple/leisure-home/cooking" element={<CookingPage />} />
+                  <Route path="/couple/leisure-home/garden" element={<GardenPage />} />
+                  <Route path="/couple/leisure-home/work" element={<WorkOrderPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

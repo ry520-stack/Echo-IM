@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Backpack, Brush, CalendarCheck, ChevronLeft, HeartHandshake, Home, PawPrint, ShoppingBag, Sparkles, SprayCan, TrendingUp } from 'lucide-react';
+import { Backpack, BriefcaseBusiness, Brush, CalendarCheck, ChefHat, ChevronLeft, HeartHandshake, Home, Leaf, PawPrint, ShoppingBag, Sparkles, SprayCan, TrendingUp } from 'lucide-react';
 import { getFurnitureCatalog, type FurnitureCatalogItem } from '../../api/furniture';
 import { cleanLeisureHome, getLeisureHome, type LeisureHomeBundle, upgradeLeisureHome } from '../../api/leisureHome';
 import { dailyGameSignin } from '../../api/gameWallet';
@@ -150,6 +150,12 @@ export default function LeisureHomePage() {
             {bundle.nextUpgradeRule ? `${bundle.nextUpgradeRule.cost} 金币 · ${bundle.nextUpgradeRule.comfort} 舒适度` : '已满级'}
           </p>
         </button>
+      </section>
+
+      <section className="mt-4 grid grid-cols-3 gap-3">
+        <QuickButton icon={<ChefHat size={20} />} label="做饭" onClick={() => nav('/couple/leisure-home/cooking')} />
+        <QuickButton icon={<Leaf size={20} />} label="种植" onClick={() => nav('/couple/leisure-home/garden')} />
+        <QuickButton icon={<BriefcaseBusiness size={20} />} label="订单" onClick={() => nav('/couple/leisure-home/work')} />
       </section>
 
       <section className="mt-4 rounded-[26px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.06]">
