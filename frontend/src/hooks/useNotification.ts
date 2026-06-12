@@ -11,6 +11,15 @@ interface NotificationData {
   chatId: string;
 }
 
+function formatMessagePreview(msg: { type?: string; content?: string }) {
+  if (msg.type === 'emoji') return '[表情]';
+  if (msg.type === 'image') return '[图片]';
+  if (msg.type === 'voice') return '[语音]';
+  if (msg.type === 'video') return '[视频]';
+  if (msg.type === 'call') return msg.content || '[通话]';
+  return (msg.content || '').slice(0, 40);
+}
+
 export function useNotification(listenForMessages = true) {
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -25,7 +34,6 @@ export function useNotification(listenForMessages = true) {
     && 'Notification' in window
     && window.isSecureContext;
 
-  // 用 ref 跟踪 pathname，避免闭包捕获旧路由
   useEffect(() => {
     pathnameRef.current = location.pathname;
   }, [location.pathname]);
@@ -60,14 +68,14 @@ export function useNotification(listenForMessages = true) {
     } catch {
       return 'denied' as NotificationPermission;
     }
-  }, []);
+  }, [canUseNotification]);
 
   const playSound = useCallback(() => {
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContextClass) return;
       if (!audioCtxRef.current) audioCtxRef.current = new AudioContextClass();
-      if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+      if (audioCtxRef.current.state === 'suspended') void audioCtxRef.current.resume();
 
       const ctx = audioCtxRef.current;
       const osc = ctx.createOscillator();
@@ -81,17 +89,19 @@ export function useNotification(listenForMessages = true) {
       gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.15);
-
-      // 节点使用完毕后 disconnect，防止内存泄漏
-      osc.onended = () => { osc.disconnect(); gain.disconnect(); };
-    } catch { /* autoplay blocked */ }
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+      };
+    } catch {
+      // Autoplay may be blocked by the runtime.
+    }
   }, []);
 
-  // 组件卸载时释放 AudioContext
   useEffect(() => {
     return () => {
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-        audioCtxRef.current.close().catch(() => {});
+        void audioCtxRef.current.close().catch(() => {});
       }
     };
   }, []);
@@ -113,18 +123,20 @@ export function useNotification(listenForMessages = true) {
 
     if (canUseNotification && isBackground && permission === 'granted') {
       try {
-        const notification = new Notification(data.senderName, {
+        const desktopNotification = new Notification(data.senderName, {
           body: data.messagePreview,
           icon: './favicon.svg',
           tag: data.chatId,
           data: { url: `#/chat/${data.chatId}` },
         });
-        notification.onclick = () => {
+        desktopNotification.onclick = () => {
           window.focus();
           window.location.hash = `#/chat/${data.chatId}`;
-          notification.close();
+          desktopNotification.close();
         };
-      } catch { /* */ }
+      } catch {
+        // Notification API may fail in embedded webviews.
+      }
     }
   }, [canUseNotification, permission, playSound]);
 
@@ -132,21 +144,21 @@ export function useNotification(listenForMessages = true) {
     setIsVisible(false);
   }, []);
 
-  // Listen for socket messages
   useEffect(() => {
     if (!listenForMessages || !socket) return;
+
     const handler = (msg: any) => {
       if (!msg.senderId || !msg.content) return;
       if (msg.senderId === user?.id) return;
-      const preview = msg.type === 'image' ? '[图片]' : msg.type === 'voice' ? '[语音]' : msg.content.slice(0, 40);
       const peerId = msg.sender?.digitalId ? String(msg.sender.digitalId) : msg.senderId;
       showNotification({
         senderName: msg.sender?.nickname || msg.sender?.username || '新消息',
-        messagePreview: preview,
+        messagePreview: formatMessagePreview(msg),
         avatar: msg.sender?.avatar,
         chatId: peerId,
       });
     };
+
     socket.on('message:receive', handler);
     return () => { socket.off('message:receive', handler); };
   }, [listenForMessages, socket, showNotification, user?.id]);

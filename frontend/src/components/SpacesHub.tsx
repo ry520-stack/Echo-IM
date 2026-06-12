@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, Users, Home, Plus, Trash2, CheckCircle2, UserPlus } from 'lucide-react';
+import { CheckCircle2, Heart, Home, Plus, Trash2, UserPlus, Users } from 'lucide-react';
 import RelationshipSpaceContent from './RelationshipSpaceContent';
 import { api } from '../api/client';
 import { assetUrl } from '../utils/assetUrl';
@@ -33,10 +33,10 @@ interface SpaceFriend {
 }
 
 const CONFIG = {
-  couple: { title: '情侣空间', subtitle: '纪念日、相册、关怀和想念', Icon: Heart, tone: 'from-rose-500 to-orange-400' },
-  friends: { title: '朋友空间', subtitle: '一起玩、愿望清单和友情约定', Icon: Users, tone: 'from-sky-500 to-cyan-400' },
-  family: { title: '家人空间', subtitle: '报平安、家庭清单和重要提醒', Icon: Home, tone: 'from-emerald-500 to-teal-400' },
-} satisfies Record<SpaceType, { title: string; subtitle: string; Icon: typeof Heart; tone: string }>;
+  couple: { title: '情侣', subtitle: '甜蜜回忆', fullTitle: '情侣空间', Icon: Heart, tone: 'from-rose-500 to-orange-400' },
+  friends: { title: '朋友', subtitle: '好友时光', fullTitle: '朋友空间', Icon: Users, tone: 'from-sky-500 to-cyan-400' },
+  family: { title: '家人', subtitle: '家人相册', fullTitle: '家人空间', Icon: Home, tone: 'from-emerald-500 to-teal-400' },
+} satisfies Record<SpaceType, { title: string; subtitle: string; fullTitle: string; Icon: typeof Heart; tone: string }>;
 
 function loadItems(type: Exclude<SpaceType, 'couple'>) {
   try {
@@ -62,45 +62,38 @@ function saveMemberIds(type: Exclude<SpaceType, 'couple'>, ids: string[]) {
   localStorage.setItem(`echo-${type}-space-members`, JSON.stringify(ids));
 }
 
-function loadPendingMemberIds(type: Exclude<SpaceType, 'couple'>) {
-  try {
-    return JSON.parse(localStorage.getItem(`echo-${type}-space-pending-members`) || '[]') as string[];
-  } catch {
-    return [];
-  }
-}
-
-function savePendingMemberIds(type: Exclude<SpaceType, 'couple'>, ids: string[]) {
-  localStorage.setItem(`echo-${type}-space-pending-members`, JSON.stringify(ids));
-}
-
 export default function SpacesHub({ onOpenAlbum }: Props) {
   const [active, setActive] = useState<SpaceType>('couple');
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#f7f6fb] dark:bg-gray-950">
-      <div className="shrink-0 px-4 pt-4">
-        <div className="grid grid-cols-3 gap-2">
-          {(Object.keys(CONFIG) as SpaceType[]).map((type) => {
-            const item = CONFIG[type];
-            const Icon = item.Icon;
-            const selected = active === type;
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setActive(type)}
-                className={`rounded-[22px] p-3 text-left shadow-sm ring-1 transition-all ${
-                  selected ? 'bg-gray-950 text-white ring-gray-950 dark:bg-white dark:text-gray-950 dark:ring-white' : 'bg-white text-gray-500 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]'
-                }`}
-              >
-                <span className={`mb-2 flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br ${item.tone} text-white`}>
-                  <Icon size={18} />
-                </span>
-                <span className="block truncate text-sm font-bold">{item.title}</span>
-              </button>
-            );
-          })}
+      <div className="shrink-0 px-4 pt-3">
+        <div className="rounded-[26px] bg-white p-1.5 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
+          <div className="grid grid-cols-3 gap-1.5">
+            {(Object.keys(CONFIG) as SpaceType[]).map(type => {
+              const item = CONFIG[type];
+              const Icon = item.Icon;
+              const selected = active === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setActive(type)}
+                  className={`flex items-center justify-center gap-2 rounded-[20px] px-2 py-3 transition-all ${
+                    selected ? 'bg-gray-950 text-white shadow-sm dark:bg-white dark:text-gray-950' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-2xl ${selected ? `bg-gradient-to-br ${item.tone} text-white` : 'bg-gray-100 text-gray-400 dark:bg-gray-800'}`}>
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0 text-left">
+                    <span className="block truncate text-sm font-black">{item.title}</span>
+                    <span className={`block truncate text-[10px] ${selected ? 'text-white/65 dark:text-gray-500' : 'text-gray-400'}`}>{item.subtitle}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -123,15 +116,33 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
   const [items, setItems] = useState(() => loadItems(type));
   const [friends, setFriends] = useState<SpaceFriend[]>([]);
   const [memberIds, setMemberIds] = useState<string[]>(() => loadMemberIds(type));
-  const [pendingMemberIds, setPendingMemberIds] = useState<string[]>(() => loadPendingMemberIds(type));
   const [memberPickerOpen, setMemberPickerOpen] = useState(false);
   const [memberManageOpen, setMemberManageOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
 
+  useEffect(() => {
+    api<SpaceFriend[]>('GET', '/api/friends').then(setFriends).catch(() => setFriends([]));
+  }, []);
+
+  useEffect(() => {
+    setItems(loadItems(type));
+    setMemberIds(loadMemberIds(type));
+    setMemberPickerOpen(false);
+    setMemberManageOpen(false);
+    setTitle('');
+    setNote('');
+  }, [type]);
+
   const sync = (next: LocalSpaceItem[]) => {
     setItems(next);
     saveItems(type, next);
+  };
+
+  const syncMembers = (next: string[]) => {
+    const unique = Array.from(new Set(next));
+    setMemberIds(unique);
+    saveMemberIds(type, unique);
   };
 
   const add = () => {
@@ -142,50 +153,10 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
     setNote('');
   };
 
-  useEffect(() => {
-    api<SpaceFriend[]>('GET', '/api/friends').then(setFriends).catch(() => setFriends([]));
-  }, []);
-
-  useEffect(() => {
-    setItems(loadItems(type));
-    setMemberIds(loadMemberIds(type));
-    setPendingMemberIds(loadPendingMemberIds(type));
-    setMemberPickerOpen(false);
-    setMemberManageOpen(false);
-    setTitle('');
-    setNote('');
-  }, [type]);
-
-  const syncMembers = (next: string[]) => {
-    const unique = Array.from(new Set(next));
-    setMemberIds(unique);
-    saveMemberIds(type, unique);
-  };
-
-  const syncPendingMembers = (next: string[]) => {
-    const unique = Array.from(new Set(next));
-    setPendingMemberIds(unique);
-    savePendingMemberIds(type, unique);
-  };
-
-  const sendMemberInvite = (peerId: string) => {
-    syncPendingMembers([...pendingMemberIds, peerId]);
-    toast('绑定邀请已发送', 'success');
-  };
-
-  const acceptLocalInvite = (peerId: string) => {
-    syncMembers([...memberIds, peerId]);
-    syncPendingMembers(pendingMemberIds.filter(id => id !== peerId));
-    toast('成员已绑定', 'success');
-  };
-
   const members = memberIds
     .map(id => friends.find(friend => friend.peer.id === id))
     .filter((friend): friend is SpaceFriend => !!friend);
-  const pendingMembers = pendingMemberIds
-    .map(id => friends.find(friend => friend.peer.id === id))
-    .filter((friend): friend is SpaceFriend => !!friend);
-  const candidates = friends.filter(friend => !memberIds.includes(friend.peer.id) && !pendingMemberIds.includes(friend.peer.id));
+  const candidates = friends.filter(friend => !memberIds.includes(friend.peer.id));
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -196,7 +167,7 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
             <Icon size={28} />
           </span>
           <div>
-            <h2 className="text-2xl font-extrabold">{config.title}</h2>
+            <h2 className="text-2xl font-extrabold">{config.fullTitle}</h2>
             <p className="mt-1 text-sm text-white/80">{config.subtitle}</p>
           </div>
         </div>
@@ -206,7 +177,7 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-base font-bold text-gray-950 dark:text-gray-50">绑定成员</p>
-            <p className="mt-1 text-xs text-gray-400">不限人数，可随时添加或移除</p>
+            <p className="mt-1 text-xs text-gray-400">可添加多个成员</p>
           </div>
           <div className="flex gap-2">
             {members.length > 0 && (
@@ -214,11 +185,7 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
                 {memberManageOpen ? '完成' : '管理'}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setMemberPickerOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-950 text-white dark:bg-white dark:text-gray-950"
-            >
+            <button type="button" onClick={() => setMemberPickerOpen(true)} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-950 text-white dark:bg-white dark:text-gray-950">
               <UserPlus size={18} />
             </button>
           </div>
@@ -229,16 +196,12 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
               const name = friend.alias || friend.peer.nickname || friend.peer.username;
               return (
                 <div key={friend.peer.id} className="relative shrink-0 text-center">
-                  <button onClick={() => navigate(`/chat/${friend.peer.digitalId || friend.peer.id}`)} className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 text-sm font-bold text-gray-500 dark:bg-gray-800">
+                  <button onClick={() => navigate(`/chat/${friend.peer.id}`)} className="mx-auto flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-gray-100 text-sm font-bold text-gray-500 dark:bg-gray-800">
                     {friend.peer.avatar ? <img src={assetUrl(friend.peer.avatar)} alt="" className="h-full w-full object-cover" /> : name[0]?.toUpperCase()}
                   </button>
                   <p className="mt-1 max-w-[72px] truncate text-xs text-gray-500">{name}</p>
                   {memberManageOpen && (
-                    <button
-                      type="button"
-                      onClick={() => syncMembers(memberIds.filter(id => id !== friend.peer.id))}
-                      className="mt-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-400 dark:bg-red-950/20"
-                    >
+                    <button type="button" onClick={() => syncMembers(memberIds.filter(id => id !== friend.peer.id))} className="mt-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-400 dark:bg-red-950/20">
                       移除
                     </button>
                   )}
@@ -251,28 +214,11 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
             还没有绑定成员
           </button>
         )}
-        {pendingMembers.length > 0 && (
-          <div className="mt-4 rounded-2xl bg-amber-50 p-3 dark:bg-amber-950/20">
-            <p className="mb-2 text-xs font-semibold text-amber-600">待确认邀请</p>
-            <div className="space-y-2">
-              {pendingMembers.map(friend => {
-                const name = friend.alias || friend.peer.nickname || friend.peer.username;
-                return (
-                  <div key={friend.peer.id} className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm text-amber-700 dark:text-amber-300">{name}</span>
-                    <button onClick={() => acceptLocalInvite(friend.peer.id)} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-gray-900">确认绑定</button>
-                    <button onClick={() => syncPendingMembers(pendingMemberIds.filter(id => id !== friend.peer.id))} className="rounded-full px-2 py-1 text-xs text-amber-500">取消</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </section>
 
       <section className="mt-4 rounded-[26px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
         <div className="grid gap-2">
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'friends' ? '例如：周末一起吃饭' : '例如：今晚给爸妈报平安'} className="rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800" />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'friends' ? '例如：周末一起吃饭' : '例如：今晚给家里报平安'} className="rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800" />
           <textarea value={note} onChange={e => setNote(e.target.value)} placeholder="备注、地点、心情或约定内容" className="min-h-[72px] resize-none rounded-2xl bg-gray-100 px-4 py-3 text-sm outline-none dark:bg-gray-800" />
           <button onClick={add} className="flex items-center justify-center gap-2 rounded-2xl bg-gray-950 py-3 text-sm font-bold text-white dark:bg-white dark:text-gray-950">
             <Plus size={16} /> 添加记录
@@ -313,11 +259,7 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
               {candidates.length ? candidates.map(friend => {
                 const name = friend.alias || friend.peer.nickname || friend.peer.username;
                 return (
-                  <button
-                    key={friend.peer.id}
-                    onClick={() => sendMemberInvite(friend.peer.id)}
-                    className="flex w-full items-center gap-3 rounded-2xl bg-gray-50 p-3 text-left dark:bg-gray-800"
-                  >
+                  <button key={friend.peer.id} onClick={() => { syncMembers([...memberIds, friend.peer.id]); toast('成员已添加', 'success'); }} className="flex w-full items-center gap-3 rounded-2xl bg-gray-50 p-3 text-left dark:bg-gray-800">
                     <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-white text-sm font-bold text-gray-500 dark:bg-gray-700">
                       {friend.peer.avatar ? <img src={assetUrl(friend.peer.avatar)} alt="" className="h-full w-full object-cover" /> : name[0]?.toUpperCase()}
                     </span>
@@ -325,7 +267,7 @@ function LocalSpace({ type }: { type: Exclude<SpaceType, 'couple'> }) {
                       <span className="block truncate text-sm font-semibold text-gray-800 dark:text-gray-100">{name}</span>
                       {friend.peer.digitalId && <span className="block text-xs text-gray-400">Echo ID: {friend.peer.digitalId}</span>}
                     </span>
-                    <span className="rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-gray-950">发送邀请</span>
+                    <span className="rounded-full bg-gray-950 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-gray-950">添加</span>
                   </button>
                 );
               }) : (

@@ -13,6 +13,7 @@ interface SearchResult {
 }
 
 function formatMessage(msg: SearchResult) {
+  if (msg.type === 'emoji') return '[表情]';
   if (msg.type === 'image') return '[图片]';
   if (msg.type === 'voice') return '[语音]';
   if (msg.type === 'video') return '[视频]';

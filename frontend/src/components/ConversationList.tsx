@@ -216,7 +216,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
       if (!targetId) return;
       setConversations(prev => {
         const exists = prev.find(c => c.peer.id === targetId);
-        const content = msg.type === 'image' ? '[图片]' : msg.type === 'voice' ? '[语音]' : msg.type === 'video' ? '[视频]' : msg.type === 'call' ? (msg.content || '[通话]') : msg.content;
+        const content = msg.type === 'emoji' ? '[表情]' : msg.type === 'image' ? '[图片]' : msg.type === 'voice' ? '[语音]' : msg.type === 'video' ? '[视频]' : msg.type === 'call' ? (msg.content || '[通话]') : msg.content;
         const lastMsg = { id: msg.id, content, type: msg.type, createdAt: msg.createdAt, senderId: msg.senderId };
         if (exists) {
           const isCurrentChat = chatId === targetId || (!exists.peer.isGroup && chatId === exists.peer.digitalId.toString());
@@ -251,6 +251,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
   };
   const formatLastMsg = (msg: LastMessage | null) => {
     if (!msg) return '';
+    if (msg.type === 'emoji') return '[表情]';
     if (msg.type === 'image') return '[图片]';
     if (msg.type === 'voice') return '[语音]';
     if (msg.type === 'video') return '[视频]';
@@ -259,6 +260,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
   };
 
   const formatSearchMsg = (msg: any) => {
+    if (msg.type === 'emoji') return '[表情]';
     if (msg.type === 'image') return '[图片]';
     if (msg.type === 'voice') return '[语音]';
     if (msg.type === 'video') return '[视频]';
@@ -349,7 +351,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                         if (contextMenu) { setContextMenu(null); return; }
                         if (Math.abs(swipeXRef.current) < 5) {
                           setConversations(prev => prev.map(c => c.peer.id === conv.peer.id ? { ...c, unreadCount: 0 } : c));
-                          nav(`/chat/${conv.peer.isGroup ? conv.peer.id : conv.peer.digitalId}`);
+                          nav(`/chat/${conv.peer.id}`);
                         }
                       }}
                       onTouchStart={(e) => handleTouchStart(e, conv.peer.id)}

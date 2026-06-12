@@ -1050,7 +1050,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
                   onContextMenu={(e) => { e.preventDefault(); setManaging(true); togglePhoto(photo.id); }}
                   className="relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-[22px] bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]"
                 >
-                  <img src={photo.url} className="w-full object-cover" draggable={false} />
+                  <img src={photo.url} className="w-full object-cover" draggable={false} loading="lazy" decoding="async" />
                   {managing && <span className={`absolute right-2 top-2 h-6 w-6 rounded-full border-2 ${selectedPhotoIds.has(photo.id) ? 'border-rose-500 bg-rose-500' : 'border-white bg-black/20'}`} />}
                 </button>
               ))}
@@ -1072,8 +1072,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
               </div>
               {group.description && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{group.description}</p>}
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {group.photos.slice(0, 8).map(photo => (
-                  <img key={photo.id} src={photo.url} className="h-36 w-28 shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} />
+                {group.photos.slice(0, 4).map(photo => (
+                  <img key={photo.id} src={photo.url} className="h-44 w-36 shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
                 ))}
                 {!group.photos.length && <div className="flex h-36 w-full items-center justify-center rounded-2xl bg-rose-50 text-sm text-rose-300 dark:bg-rose-950/20">还没有照片</div>}
               </div>

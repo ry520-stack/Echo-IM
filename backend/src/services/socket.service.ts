@@ -183,7 +183,7 @@ export function initSocket(httpServer: HttpServer) {
     }, ack?: (res: any) => void) => {
       try {
         // 基础校验
-        if (!data.content?.trim() && data.type !== 'image' && data.type !== 'voice' && data.type !== 'video') {
+        if (!data.content?.trim() && data.type !== 'image' && data.type !== 'emoji' && data.type !== 'voice' && data.type !== 'video') {
           return ack?.({ error: 'EMPTY_MESSAGE', message: '消息内容不能为空' });
         }
         if (data.content && data.content.length > 3000) {

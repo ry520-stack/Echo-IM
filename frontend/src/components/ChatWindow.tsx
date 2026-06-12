@@ -377,7 +377,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     if (!force && emojisCachedRef.current && emojis.length > 0) return;
     try {
       const items = await api<any[]>('GET', '/api/emojis');
-      setEmojis(items);
+      setEmojis(applyEmojiOrder(items));
       emojisCachedRef.current = true;
     } catch { /* */ }
   };
@@ -399,8 +399,8 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       if (!Array.isArray(saved) || saved.length === 0) return items;
       const rank = new Map(saved.map((id, index) => [id, index]));
       return [...items].sort((a, b) => {
-        const ai = rank.has(a.id) ? rank.get(a.id)! : Number.MAX_SAFE_INTEGER;
-        const bi = rank.has(b.id) ? rank.get(b.id)! : Number.MAX_SAFE_INTEGER;
+        const ai = rank.has(a.id) ? rank.get(a.id)! : -1;
+        const bi = rank.has(b.id) ? rank.get(b.id)! : -1;
         return ai - bi;
       });
     } catch {
@@ -1375,7 +1375,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       receiverId: isGroup ? null : peerId,
       groupId: isGroup ? peerId : null,
       content: emoji.imageUrl,
-      type: 'image',
+      type: 'emoji',
       isRecalled: false,
       replyToId: replyTo?.id || null,
       replyTo: replyTo ? { id: replyTo.id, content: replyTo.content, type: replyTo.type, sender: replyTo.sender } : null,
@@ -1386,7 +1386,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     socket.emit('message:send', {
       ...(isGroup ? { groupId: peerId } : { receiverId: peerId }),
-      content: emoji.imageUrl, type: 'image',
+      content: emoji.imageUrl, type: 'emoji',
       replyToId: replyTo?.id || undefined,
     }, (res: any) => {
       if (res?.error) {
@@ -1478,7 +1478,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
             className={`relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-[24px] border-2 border-white bg-gradient-to-br ${petStage(pet.level).color} text-xl font-bold text-white shadow-xl ${petStage(pet.level).glow}`}
             title="戳一戳宠物"
           >
-            {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" /> : <PawPrint size={26} />}
+            {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : <PawPrint size={26} />}
             <span className="absolute bottom-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-white/95 px-1 text-[10px] font-bold text-amber-600 shadow">
               {petStatusMark(pet, petAction)}
             </span>
@@ -1632,7 +1632,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   {msg.replyTo && !msg.isRecalled && (
                     <div className={`mb-1 max-w-[75%] rounded-lg bg-gray-200/60 px-3 py-1.5 text-xs text-gray-500 dark:bg-gray-800 ${isMine ? 'text-right' : ''}`}>
                       <span className="font-medium text-primary-500">{msg.replyTo.sender.nickname || msg.replyTo.sender.username}:</span>{' '}
-                      {msg.replyTo.type === 'image' ? '[图片]' : msg.replyTo.type === 'video' ? '[视频]' : msg.replyTo.type === 'voice' ? '[语音]' : msg.replyTo.type === 'call' ? (msg.replyTo.content || '[通话]') : msg.replyTo.content.slice(0, 30)}
+                      {msg.replyTo.type === 'emoji' ? '[表情]' : msg.replyTo.type === 'image' ? '[图片]' : msg.replyTo.type === 'video' ? '[视频]' : msg.replyTo.type === 'voice' ? '[语音]' : msg.replyTo.type === 'call' ? (msg.replyTo.content || '[通话]') : msg.replyTo.content.slice(0, 30)}
                     </div>
                   )}
 
@@ -1700,9 +1700,27 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           </span>
                         ) : (
                           <>
-                            {msg.type === 'image' ? (
+                            {msg.type === 'emoji' ? (
+                              <button
+                                type="button"
+                                onClick={() => collectAsEmoji(msg.content)}
+                                className="rounded-2xl bg-transparent p-0"
+                                title="收藏"
+                              >
+                                <img
+                                  src={assetUrl(msg.content)}
+                                  alt=""
+                                  draggable={false}
+                                  onContextMenu={(e) => e.preventDefault()}
+                                  onDragStart={(e) => e.preventDefault()}
+                                  className="max-h-[150px] max-w-[150px] object-contain"
+                                  loading="lazy"
+                                  onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)}
+                                />
+                              </button>
+                            ) : msg.type === 'image' ? (
                               <div className="relative">
-                                <img src={assetUrl(msg.content)} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()} onClick={() => setEmojiPreview(assetUrl(msg.content))} className="max-h-[170px] max-w-[170px] cursor-pointer rounded-2xl object-contain" loading="lazy" onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)} />
+                                <img src={assetUrl(msg.content)} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()} onClick={() => setEmojiPreview(assetUrl(msg.content))} className="max-h-[260px] max-w-[min(72vw,280px)] cursor-pointer rounded-2xl object-contain" loading="lazy" onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)} />
                                 <button
                                   onClick={() => collectAsEmoji(msg.content)}
                                   className="absolute -bottom-5 right-0 hidden rounded bg-gray-700 px-1.5 py-0.5 text-[10px] text-white group-hover:block hover:bg-gray-600"
@@ -1766,7 +1784,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
         <div className="flex items-center gap-2 border-t border-gray-100 bg-gray-50 px-4 py-2 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex-1 border-l-2 border-primary-400 pl-2 text-xs text-gray-500 dark:text-gray-400">
             <span className="font-medium text-primary-500">{replyTo.sender.nickname || replyTo.sender.username}:</span>{' '}
-            {replyTo.type === 'image' ? '[图片]' : replyTo.type === 'video' ? '[视频]' : replyTo.type === 'voice' ? '[语音]' : replyTo.type === 'call' ? (replyTo.content || '[通话]') : replyTo.content.slice(0, 40)}
+            {replyTo.type === 'emoji' ? '[表情]' : replyTo.type === 'image' ? '[图片]' : replyTo.type === 'video' ? '[视频]' : replyTo.type === 'voice' ? '[语音]' : replyTo.type === 'call' ? (replyTo.content || '[通话]') : replyTo.content.slice(0, 40)}
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-gray-400 hover:text-gray-600">✕</button>
         </div>
@@ -1891,7 +1909,10 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           else { toast(data.error || '上传失败', 'error'); }
                         } catch (err: any) { toast(err.message || '上传失败', 'error'); }
                       }
-                      if (uploaded > 0) fetchEmojis(true);
+                      if (uploaded > 0) {
+                        setEmojiPage(0);
+                        fetchEmojis(true);
+                      }
                       if (uploaded < files.length) toast(`${files.length - uploaded} 个文件上传失败`, 'error');
                     }
                   }} />
@@ -2157,6 +2178,12 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   </button>
                 </>
               )}
+              {m.type === 'emoji' && m.content && (
+                <button onClick={(e) => { e.stopPropagation(); collectAsEmoji(m.content!); setMsgContextMenu(null); }}
+                  className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                  收藏
+                </button>
+              )}
               <button onClick={(e) => { e.stopPropagation();
                 setMessages(prev => prev.filter(msg => msg.id !== m.msgId));
                 setMsgContextMenu(null);
@@ -2385,7 +2412,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
 
       {emojiPreview && (
         <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center" onClick={() => setEmojiPreview(null)}>
-          <img src={emojiPreview} alt="" className="max-w-[80vw] max-h-[60vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+          <img src={emojiPreview} alt="" className="max-w-[96vw] max-h-[86vh] object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
 

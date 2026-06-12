@@ -8,9 +8,13 @@ export async function getEmojis(userId: string) {
 }
 
 export async function createEmoji(userId: string, imageUrl: string, name: string) {
-  const last = await prisma.emoji.findFirst({ where: { userId }, orderBy: { sortOrder: 'desc' }, select: { sortOrder: true } });
+  const first = await prisma.emoji.findFirst({
+    where: { userId },
+    orderBy: { sortOrder: 'asc' },
+    select: { sortOrder: true },
+  });
   return prisma.emoji.create({
-    data: { userId, imageUrl, name: name || 'emoji', sortOrder: (last?.sortOrder || 0) + 1 },
+    data: { userId, imageUrl, name: name || 'emoji', sortOrder: (first?.sortOrder ?? 0) - 1 },
   });
 }
 
@@ -32,9 +36,6 @@ export async function deleteEmoji(id: string, userId: string) {
 
 export async function batchDeleteEmojis(ids: string[], userId: string) {
   return prisma.emoji.deleteMany({
-    where: {
-      id: { in: ids },
-      userId, // 只删除自己的表情
-    },
+    where: { id: { in: ids }, userId },
   });
 }

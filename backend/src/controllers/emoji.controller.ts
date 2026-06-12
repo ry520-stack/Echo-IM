@@ -32,7 +32,7 @@ export async function deleteEmoji(req: Request, res: Response) {
 
 export async function batchDeleteEmojis(req: Request, res: Response) {
   const { ids } = req.body;
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+  if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'ids 为必填' });
   }
   try {
