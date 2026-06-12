@@ -62,6 +62,7 @@ interface Weather {
   windpower?: string;
   humidity?: string;
   city?: string;
+  reporttime?: string;
 }
 
 interface AlbumPhoto {
@@ -268,18 +269,22 @@ async function loadWeatherByCity(city: string): Promise<Weather | null> {
   const cached = readWeatherCache(cacheKey);
   if (cached !== undefined) return cached;
   try {
-    const geo = await geocodeCity(city);
-    if (!geo) {
-      writeWeatherCache(cacheKey, null);
-      return null;
-    }
-    const weather = await loadWeather(geo.lat, geo.lon);
-    const result = weather ? { ...weather, city: geo.city } : null;
+    const result = await api<Weather | null>('GET', `/api/couples/weather?city=${encodeURIComponent(city.trim() || DEFAULT_PEER_CITY)}`);
     writeWeatherCache(cacheKey, result);
     return result;
   } catch {
     writeWeatherCache(cacheKey, null);
     return null;
+  }
+}
+
+async function loadDistanceByCity(from: string, to: string): Promise<string> {
+  if (!from.trim() || !to.trim()) return '';
+  try {
+    const result = await api<{ km?: number } | null>('GET', `/api/couples/distance?from=${encodeURIComponent(from.trim())}&to=${encodeURIComponent(to.trim())}`);
+    return result?.km ? `相距约 ${result.km} km` : '';
+  } catch {
+    return '';
   }
 }
 
@@ -389,6 +394,7 @@ export default function RelationshipSpaceContent({
   const [city, setCity] = useState('');
   const [myWeather, setMyWeather] = useState<Weather | null>(null);
   const [peerWeather, setPeerWeather] = useState<Weather | null>(null);
+  const [distanceText, setDistanceText] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const [featurePage, setFeaturePage] = useState<FeaturePage>(null);
 
@@ -415,9 +421,11 @@ export default function RelationshipSpaceContent({
       Promise.all([
         couple.myWeather ? Promise.resolve(couple.myWeather) : (myCity ? loadWeatherByCity(myCity) : loadWeather(couple.myLat, couple.myLon)),
         couple.peerWeather ? Promise.resolve(couple.peerWeather) : loadWeatherByCity(peerCity),
-      ]).then(([mine, peer]) => {
+        loadDistanceByCity(myCity, peerCity),
+      ]).then(([mine, peer, distance]) => {
         setMyWeather(mine);
         setPeerWeather(peer);
+        setDistanceText(distance);
       });
     }
   }, []);
@@ -561,6 +569,12 @@ export default function RelationshipSpaceContent({
           <WeatherCard title="我的天气" city={getMyCity(space)} weather={myWeather} />
           <WeatherCard title="对方天气" city={getPeerCity(space)} weather={peerWeather} />
         </section>
+
+        {distanceText && (
+          <section className="rounded-[24px] bg-white p-4 text-sm font-bold text-gray-900 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:text-gray-50 dark:ring-white/[0.05]">
+            {distanceText}
+          </section>
+        )}
 
         <button
           type="button"

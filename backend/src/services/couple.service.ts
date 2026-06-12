@@ -1,4 +1,4 @@
-import prisma from '../utils/prisma';
+﻿import prisma from '../utils/prisma';
 import { getIO } from './socket.service';
 import { pushToUsers } from './push.service';
 
@@ -26,7 +26,7 @@ async function findMine(userId: string) {
 
 async function requireActiveBond(userId: string) {
   const bond = await findMine(userId);
-  if (!bond || !['active', 'pending-unbind'].includes(bond.status)) throw new Error('情侣关系尚未生效');
+  if (!bond || !['active', 'pending-unbind'].includes(bond.status)) throw new Error('鎯呬荆鍏崇郴灏氭湭鐢熸晥');
   return bond;
 }
 
@@ -42,7 +42,7 @@ async function requireFriend(userId: string, otherId: string) {
       ],
     },
   });
-  if (!friend) throw new Error('只有好友才能申请绑定情侣');
+  if (!friend) throw new Error('鍙湁濂藉弸鎵嶈兘鐢宠缁戝畾鎯呬荆');
 }
 
 export async function getSummary(userId: string) {
@@ -89,7 +89,7 @@ export async function requestBond(userId: string, otherId: string) {
       OR: [{ userAId: { in: [userId, otherId] } }, { userBId: { in: [userId, otherId] } }],
     },
   });
-  if (occupied) throw new Error('你或对方已有待处理或生效中的情侣关系');
+  if (occupied) throw new Error('浣犳垨瀵规柟宸叉湁寰呭鐞嗘垨鐢熸晥涓殑鎯呬荆鍏崇郴');
   const ids = pair(userId, otherId);
   const updateData: any = { requestedBy: userId, status: 'pending', endedAt: null };
   updateData.bondedAt = null;
@@ -104,7 +104,7 @@ export async function requestBond(userId: string, otherId: string) {
 
 export async function respond(userId: string, accept: boolean) {
   const bond = await findMine(userId);
-  if (!bond || bond.status !== 'pending' || bond.requestedBy === userId) throw new Error('没有可处理的情侣请求');
+  if (!bond || bond.status !== 'pending' || bond.requestedBy === userId) throw new Error('娌℃湁鍙鐞嗙殑鎯呬荆璇锋眰');
   const acceptData: any = accept ? { status: 'active', bondedAt: new Date() } : { status: 'rejected', endedAt: new Date() };
   const updated = await prisma.coupleBond.update({
     where: { id: bond.id },
@@ -151,10 +151,10 @@ export async function sendSos(userId: string) {
 
 export async function unbind(userId: string) {
   const bond = await requireActiveBond(userId);
-  if (bond.status === 'pending-unbind') throw new Error('解绑请求正在等待对方处理');
+  if (bond.status === 'pending-unbind') throw new Error('瑙ｇ粦璇锋眰姝ｅ湪绛夊緟瀵规柟澶勭悊');
   const bondedAt = (bond as any).bondedAt || (bond as any).boundAt;
   const unlockAt = bondedAt ? bondedAt.getTime() + UNBIND_LOCK_MS : Infinity;
-  if (Date.now() < unlockAt) throw new Error(`绑定后 90 天内不可主动解除，解锁时间：${new Date(unlockAt).toLocaleString('zh-CN')}`);
+  if (Date.now() < unlockAt) throw new Error(`缁戝畾鍚?90 澶╁唴涓嶅彲涓诲姩瑙ｉ櫎锛岃В閿佹椂闂达細${new Date(unlockAt).toLocaleString('zh-CN')}`);
   const updated = await prisma.coupleBond.update({ where: { id: bond.id }, data: { status: 'ended', endedAt: new Date() } as any });
   notify(updated, 'unbind');
   return { status: 'none' };
@@ -181,8 +181,8 @@ export async function requestUnbind(userId: string) {
   getIO()?.to(`user:${targetId}`).emit('couple:unbind-request', { peerId: userId });
   pushToUsers({
     userIds: [targetId],
-    title: 'Echo 情侣空间',
-    body: '对方申请解除情侣空间绑定',
+    title: 'Echo 鎯呬荆绌洪棿',
+    body: '瀵规柟鐢宠瑙ｉ櫎鎯呬荆绌洪棿缁戝畾',
     payload: { type: 'couple-unbind-request', chatId: userId },
   }).catch(() => {});
   notify(updated, 'unbind-request');
@@ -191,7 +191,7 @@ export async function requestUnbind(userId: string) {
 
 export async function respondUnbind(userId: string, accept: boolean) {
   const bond = await findMine(userId);
-  if (!bond || bond.status !== 'pending-unbind' || bond.requestedBy === userId) throw new Error('没有可处理的解绑请求');
+  if (!bond || bond.status !== 'pending-unbind' || bond.requestedBy === userId) throw new Error('娌℃湁鍙鐞嗙殑瑙ｇ粦璇锋眰');
   const updated = await prisma.coupleBond.update({
     where: { id: bond.id },
     data: accept ? ({ status: 'ended', endedAt: new Date() } as any) : { status: 'active' },
@@ -313,8 +313,8 @@ export async function getActivityConfig(_userId?: string) {
   return {
     events: [],
     petSkins: [
-      { key: 'classic', name: '经典伙伴', unlocked: true },
-      { key: 'starlight', name: '星光限定', unlocked: false },
+      { key: 'classic', name: '缁忓吀浼欎即', unlocked: true },
+      { key: 'starlight', name: '鏄熷厜闄愬畾', unlocked: false },
     ],
   };
 }
@@ -322,7 +322,7 @@ export async function getActivityConfig(_userId?: string) {
 export async function updatePetSkin(userId: string, skin: string) {
   const bond = await requireActiveBond(userId);
   const pet = await prisma.petBond.findUnique({ where: { userAId_userBId: { userAId: bond.userAId, userBId: bond.userBId } } });
-  if (!pet) throw new Error('请先领养共同宠物');
+  if (!pet) throw new Error('璇峰厛棰嗗吇鍏卞悓瀹犵墿');
   return prisma.petBond.update({ where: { id: pet.id }, data: { skin: skin || 'classic' } as any });
 }
 
@@ -334,133 +334,165 @@ function parseJson<T>(value: string, fallback: T): T {
   }
 }
 
-function normalizeAlbumItem(item: any) {
-  const meta = parseJson<{ title?: string; date?: string; location?: string; description?: string; coverUrl?: string }>(item.content, {});
+function albumCoupleKey(bond: { userAId: string; userBId: string }) {
+  return `${bond.userAId}_${bond.userBId}`;
+}
+
+function normalizeAlbumGroup(group: any, photos: any[] = []) {
+  const normalizedPhotos = photos.map(photo => ({
+    id: photo.id,
+    url: photo.url || photo.previewUrl || photo.originalUrl || photo.thumbUrl || '',
+    originalUrl: photo.originalUrl || photo.url || '',
+    previewUrl: photo.previewUrl || photo.url || '',
+    thumbUrl: photo.thumbUrl || photo.previewUrl || photo.url || '',
+    type: photo.type || 'image',
+    width: photo.width || 0,
+    height: photo.height || 0,
+    duration: photo.duration || 0,
+    size: photo.size || 0,
+    description: photo.description || '',
+    createdAt: photo.createdAt,
+  }));
   return {
-    id: item.id,
-    title: meta.title || item.title || '日常碎片',
-    date: meta.date || '',
-    location: meta.location || item.cityName || '',
-    description: meta.description || '',
-    coverUrl: meta.coverUrl || '',
-    photos: parseJson<any[]>(item.images, []),
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
+    id: group.id,
+    title: group.title || '日常碎片',
+    date: group.date || '',
+    location: group.location || '',
+    description: group.description || '',
+    coverUrl: group.coverUrl || normalizedPhotos[0]?.thumbUrl || normalizedPhotos[0]?.previewUrl || normalizedPhotos[0]?.url || '',
+    photos: normalizedPhotos,
+    createdAt: group.createdAt,
+    updatedAt: group.updatedAt,
+  };
+}
+
+function albumPhotoData(groupId: string, photo: any, sortOrder: number) {
+  return {
+    groupId,
+    url: photo.url || photo.previewUrl || photo.originalUrl || photo.thumbUrl || '',
+    originalUrl: photo.originalUrl || photo.url || '',
+    previewUrl: photo.previewUrl || photo.url || '',
+    thumbUrl: photo.thumbUrl || photo.previewUrl || photo.url || '',
+    type: photo.type || 'image',
+    width: Number(photo.width) || null,
+    height: Number(photo.height) || null,
+    duration: Number(photo.duration) || null,
+    size: Number(photo.size) || null,
+    sortOrder,
+    description: photo.description || '',
   };
 }
 
 export async function getAlbumGroups(userId: string) {
   const bond = await requireActiveBond(userId);
-  const items = await (prisma as any).coupleItem.findMany({
-    where: { coupleId: bond.id, type: 'album', archived: false },
-    orderBy: { createdAt: 'desc' },
+  const groups = await (prisma as any).albumGroup.findMany({
+    where: { coupleId: albumCoupleKey(bond), type: 'couple' },
+    orderBy: { updatedAt: 'desc' },
   });
-  return items.map(normalizeAlbumItem);
+  const photos = groups.length ? await (prisma as any).albumPhoto.findMany({
+    where: { groupId: { in: groups.map((group: any) => group.id) } },
+    orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+  }) : [];
+  const photoMap = new Map<string, any[]>();
+  for (const photo of photos) {
+    const list = photoMap.get(photo.groupId) || [];
+    list.push(photo);
+    photoMap.set(photo.groupId, list);
+  }
+  return groups.map((group: any) => normalizeAlbumGroup(group, photoMap.get(group.id) || []));
 }
 
 export async function createAlbumGroup(userId: string, data: any) {
   const bond = await requireActiveBond(userId);
   const photos = Array.isArray(data.photos) ? data.photos : [];
-  const meta = {
-    title: String(data.title || '日常碎片').trim() || '日常碎片',
-    date: data.date || '',
-    location: data.location || '',
-    description: data.description || '',
-    coverUrl: data.coverUrl || photos[0]?.url || '',
-  };
-  const item = await (prisma as any).coupleItem.create({
+  const group = await (prisma as any).albumGroup.create({
     data: {
-      coupleId: bond.id,
-      createdBy: userId,
-      type: 'album',
-      title: meta.title,
-      content: JSON.stringify(meta),
-      images: JSON.stringify(photos),
-      cityName: meta.location,
-      happenedAt: meta.date ? new Date(`${meta.date}T00:00:00+08:00`) : null,
+      userId,
+      coupleId: albumCoupleKey(bond),
+      type: 'couple',
+      title: String(data.title || '日常碎片').trim() || '日常碎片',
+      date: data.date || null,
+      location: data.location || null,
+      description: data.description || null,
+      coverUrl: data.coverUrl || photos[0]?.thumbUrl || photos[0]?.previewUrl || photos[0]?.url || null,
     },
   });
+  if (photos.length) {
+    await (prisma as any).albumPhoto.createMany({ data: photos.map((photo: any, index: number) => albumPhotoData(group.id, photo, index)) });
+  }
   notify(bond, 'album');
-  return normalizeAlbumItem(item);
+  return normalizeAlbumGroup(group, photos);
 }
 
 export async function updateAlbumGroup(userId: string, groupId: string, data: any) {
   const bond = await requireActiveBond(userId);
-  const item = await (prisma as any).coupleItem.findFirst({ where: { id: groupId, coupleId: bond.id, type: 'album', archived: false } });
-  if (!item) throw new Error('相册标签不存在');
-  const current = normalizeAlbumItem(item);
-  const meta = {
-    title: data.title !== undefined ? String(data.title || '').trim() || '日常碎片' : current.title,
-    date: data.date !== undefined ? data.date || '' : current.date,
-    location: data.location !== undefined ? data.location || '' : current.location,
-    description: data.description !== undefined ? data.description || '' : current.description,
-    coverUrl: data.coverUrl !== undefined ? data.coverUrl || '' : current.coverUrl,
-  };
-  const updated = await (prisma as any).coupleItem.update({
+  const group = await (prisma as any).albumGroup.findFirst({ where: { id: groupId, coupleId: albumCoupleKey(bond), type: 'couple' } });
+  if (!group) throw new Error('相册标签不存在');
+  const updated = await (prisma as any).albumGroup.update({
     where: { id: groupId },
     data: {
-      title: meta.title,
-      content: JSON.stringify(meta),
-      cityName: meta.location,
-      happenedAt: meta.date ? new Date(`${meta.date}T00:00:00+08:00`) : null,
+      title: data.title !== undefined ? String(data.title || '').trim() || '日常碎片' : undefined,
+      date: data.date !== undefined ? data.date || null : undefined,
+      location: data.location !== undefined ? data.location || null : undefined,
+      description: data.description !== undefined ? data.description || null : undefined,
+      coverUrl: data.coverUrl !== undefined ? data.coverUrl || null : undefined,
     },
   });
   notify(bond, 'album');
-  return normalizeAlbumItem(updated);
+  const photos = await (prisma as any).albumPhoto.findMany({ where: { groupId }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] });
+  return normalizeAlbumGroup(updated, photos);
 }
 
 export async function deleteAlbumGroup(userId: string, groupId: string) {
   const bond = await requireActiveBond(userId);
-  const item = await (prisma as any).coupleItem.findFirst({ where: { id: groupId, coupleId: bond.id, type: 'album', archived: false } });
-  if (!item) throw new Error('相册标签不存在');
-  await (prisma as any).coupleItem.update({ where: { id: groupId }, data: { archived: true } });
+  const group = await (prisma as any).albumGroup.findFirst({ where: { id: groupId, coupleId: albumCoupleKey(bond), type: 'couple' } });
+  if (!group) throw new Error('相册标签不存在');
+  await prisma.$transaction(async tx => {
+    await (tx as any).albumPhoto.deleteMany({ where: { groupId } });
+    await (tx as any).albumGroup.delete({ where: { id: groupId } });
+  });
   notify(bond, 'album');
   return { ok: true };
 }
 
 export async function addAlbumPhotos(userId: string, groupId: string, photos: any[]) {
   const bond = await requireActiveBond(userId);
-  const item = await (prisma as any).coupleItem.findFirst({ where: { id: groupId, coupleId: bond.id, type: 'album', archived: false } });
-  if (!item) throw new Error('相册标签不存在');
-  const current = normalizeAlbumItem(item);
-  const nextPhotos = [...photos, ...current.photos];
-  const meta = {
-    title: current.title,
-    date: current.date,
-    location: current.location,
-    description: current.description,
-    coverUrl: current.coverUrl || nextPhotos[0]?.url || '',
-  };
-  const updated = await (prisma as any).coupleItem.update({
-    where: { id: groupId },
-    data: { images: JSON.stringify(nextPhotos), content: JSON.stringify(meta) },
-  });
+  const group = await (prisma as any).albumGroup.findFirst({ where: { id: groupId, coupleId: albumCoupleKey(bond), type: 'couple' } });
+  if (!group) throw new Error('相册标签不存在');
+  const count = await (prisma as any).albumPhoto.count({ where: { groupId } });
+  if (photos.length) {
+    await (prisma as any).albumPhoto.createMany({ data: photos.map((photo: any, index: number) => albumPhotoData(groupId, photo, count + index)) });
+  }
+  if (!group.coverUrl && photos[0]) {
+    await (prisma as any).albumGroup.update({
+      where: { id: groupId },
+      data: { coverUrl: photos[0].thumbUrl || photos[0].previewUrl || photos[0].url || null },
+    });
+  }
   notify(bond, 'album');
-  return normalizeAlbumItem(updated);
+  const [updated, nextPhotos] = await Promise.all([
+    (prisma as any).albumGroup.findUnique({ where: { id: groupId } }),
+    (prisma as any).albumPhoto.findMany({ where: { groupId }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] }),
+  ]);
+  return normalizeAlbumGroup(updated, nextPhotos);
 }
 
 export async function deleteAlbumPhotos(userId: string, groupId: string, photoIds: string[]) {
   const bond = await requireActiveBond(userId);
-  const item = await (prisma as any).coupleItem.findFirst({ where: { id: groupId, coupleId: bond.id, type: 'album', archived: false } });
-  if (!item) throw new Error('相册标签不存在');
-  const removeSet = new Set(photoIds);
-  const current = normalizeAlbumItem(item);
-  const photos = current.photos.filter((photo: any) => !removeSet.has(photo.id));
-  const meta = {
-    title: current.title,
-    date: current.date,
-    location: current.location,
-    description: current.description,
-    coverUrl: photos.some((photo: any) => photo.url === current.coverUrl) ? current.coverUrl : photos[0]?.url || '',
-  };
-  const updated = await (prisma as any).coupleItem.update({
+  const group = await (prisma as any).albumGroup.findFirst({ where: { id: groupId, coupleId: albumCoupleKey(bond), type: 'couple' } });
+  if (!group) throw new Error('相册标签不存在');
+  await (prisma as any).albumPhoto.deleteMany({ where: { groupId, id: { in: photoIds } } });
+  const photos = await (prisma as any).albumPhoto.findMany({ where: { groupId }, orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] });
+  const coverStillExists = photos.some((photo: any) => [photo.url, photo.previewUrl, photo.thumbUrl, photo.originalUrl].includes(group.coverUrl));
+  const updated = await (prisma as any).albumGroup.update({
     where: { id: groupId },
-    data: { images: JSON.stringify(photos), content: JSON.stringify(meta) },
+    data: { coverUrl: coverStillExists ? group.coverUrl : photos[0]?.thumbUrl || photos[0]?.previewUrl || photos[0]?.url || null },
   });
   notify(bond, 'album');
-  return normalizeAlbumItem(updated);
+  return normalizeAlbumGroup(updated, photos);
 }
-
 export function startWeeklyReportScheduler() {
   return undefined;
 }
+
+

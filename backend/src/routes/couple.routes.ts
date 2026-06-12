@@ -22,4 +22,6 @@ router.patch('/album/groups/:groupId', coupleController.updateAlbumGroup);
 router.delete('/album/groups/:groupId', coupleController.deleteAlbumGroup);
 router.post('/album/groups/:groupId/photos', coupleController.addAlbumPhotos);
 router.delete('/album/groups/:groupId/photos', coupleController.deleteAlbumPhotos);
+router.get('/weather', coupleController.getWeather);
+router.get('/distance', coupleController.getDistance);
 export default router;

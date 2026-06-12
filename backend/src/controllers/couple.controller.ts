@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import * as coupleService from '../services/couple.service';
+import { getAmapWeather, getCityDistance } from '../services/amap.service';
 
 export async function getMine(req: Request, res: Response) {
   try { res.json(await coupleService.getMine(req.userId)); } catch (e: any) { res.status(400).json({ error: e.message }); }
@@ -54,4 +55,12 @@ export async function addAlbumPhotos(req: Request, res: Response) {
 }
 export async function deleteAlbumPhotos(req: Request, res: Response) {
   try { res.json(await coupleService.deleteAlbumPhotos(req.userId, req.params.groupId, Array.isArray(req.body?.photoIds) ? req.body.photoIds : [])); } catch (e: any) { res.status(400).json({ error: e.message }); }
+}
+
+export async function getWeather(req: Request, res: Response) {
+  try { res.json(await getAmapWeather(String(req.query.city || '曲阜'))); } catch (e: any) { res.status(400).json({ error: e.message }); }
+}
+
+export async function getDistance(req: Request, res: Response) {
+  try { res.json(await getCityDistance(String(req.query.from || ''), String(req.query.to || ''))); } catch (e: any) { res.status(400).json({ error: e.message }); }
 }
