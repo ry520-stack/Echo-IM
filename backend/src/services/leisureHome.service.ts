@@ -35,16 +35,18 @@ export function placementLimit(level: number) {
 export async function ensureHome(userId: string) {
   await ensureLeisureSeedData();
   const { bond, peerId } = await requireActiveCouple(userId);
+
   const [home, myWallet, peerWallet] = await prisma.$transaction(async tx => {
     const nextHome = await (tx as any).coupleLeisureHome.upsert({
       where: { coupleId: bond.id },
       create: { coupleId: bond.id },
       update: {},
     });
-    const walletA = await ensureWallet(userId, tx as any);
-    const walletB = await ensureWallet(peerId, tx as any);
+    const walletA = await ensureWallet(userId, tx);
+    const walletB = await ensureWallet(peerId, tx);
     return [nextHome, walletA, walletB];
   });
+
   return { bond, peerId, home, myWallet, peerWallet };
 }
 
@@ -63,6 +65,7 @@ async function loadHomeBundle(userId: string) {
       select: { id: true, username: true, nickname: true, avatar: true, digitalId: true },
     }),
   ]);
+
   return { ...base, placed, pet, peer, placementLimit: placementLimit(base.home.level) };
 }
 
@@ -99,23 +102,28 @@ export async function saveLayout(userId: string, raw: unknown) {
   for (const inv of inventories) {
     owned.set(inv.furnitureId, (owned.get(inv.furnitureId) || 0) + inv.quantity);
   }
+
   const used = new Map<string, number>();
   const cells = new Set<string>();
 
   for (const item of payload.items) {
     const meta = catalogMap.get(item.furnitureId);
     if (!meta) throw new Error('家具不存在');
+
     used.set(item.furnitureId, (used.get(item.furnitureId) || 0) + 1);
     if ((used.get(item.furnitureId) || 0) > (owned.get(item.furnitureId) || 0)) {
       throw new Error(`${meta.name} 库存不足`);
     }
+
     const width = Math.max(0, Number(meta.width || 0));
     const height = Math.max(0, Number(meta.height || 0));
     if (width === 0 || height === 0) continue;
+
     const rotated = Math.abs(item.rotation % 180) === 90;
     const w = rotated ? height : width;
     const h = rotated ? width : height;
     if (item.x + w > ROOM_WIDTH || item.y + h > ROOM_HEIGHT) throw new Error(`${meta.name} 超出小屋边界`);
+
     for (let dx = 0; dx < w; dx += 1) {
       for (let dy = 0; dy < h; dy += 1) {
         const key = `${item.x + dx}:${item.y + dy}`;
@@ -145,6 +153,7 @@ export async function saveLayout(userId: string, raw: unknown) {
         })),
       });
     }
+
     const updatedHome = await (tx as any).coupleLeisureHome.update({
       where: { id: home.id },
       data: {
@@ -152,6 +161,7 @@ export async function saveLayout(userId: string, raw: unknown) {
         layoutJson: JSON.stringify(payload.items),
       },
     });
+
     return { bond, home: updatedHome, placed: payload.items };
   });
 }

@@ -6,5 +6,6 @@ const router = Router();
 router.use(authenticate);
 router.get('/', gameWalletController.getWallet);
 router.get('/transactions', gameWalletController.getTransactions);
+router.post('/signin', gameWalletController.dailySignin);
 
 export default router;

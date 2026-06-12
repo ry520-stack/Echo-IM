@@ -16,3 +16,11 @@ export async function getTransactions(req: Request, res: Response) {
     res.status(400).json({ error: e.message });
   }
 }
+
+export async function dailySignin(req: Request, res: Response) {
+  try {
+    res.json(await gameWalletService.dailySignin(req.userId));
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+}

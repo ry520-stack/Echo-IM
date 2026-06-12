@@ -22,9 +22,42 @@ let seeded = false;
 
 export async function ensureLeisureSeedData() {
   if (seeded) return;
-  const count = await (prisma as any).furnitureCatalog.count();
-  if (count === 0) {
-    await (prisma as any).furnitureCatalog.createMany({ data: FURNITURE_SEED });
+
+  for (const item of FURNITURE_SEED) {
+    const existingItems = await (prisma as any).furnitureCatalog.findMany({
+      where: { type: item.type, icon: item.icon, isLimited: false },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (existingItems.length > 0) {
+      const [keeper, ...duplicates] = existingItems;
+      await prisma.$transaction(async tx => {
+        await (tx as any).furnitureCatalog.update({ where: { id: keeper.id }, data: item });
+        for (const duplicate of duplicates) {
+          await mergeFurnitureInventory(tx, duplicate.id, keeper.id);
+          await (tx as any).homePlacedFurniture.updateMany({
+            where: { furnitureId: duplicate.id },
+            data: { furnitureId: keeper.id },
+          });
+          await (tx as any).furnitureCatalog.delete({ where: { id: duplicate.id } });
+        }
+      });
+    } else {
+      await (prisma as any).furnitureCatalog.create({ data: item });
+    }
   }
+
   seeded = true;
+}
+
+async function mergeFurnitureInventory(tx: any, fromFurnitureId: string, toFurnitureId: string) {
+  const sourceRows = await tx.userFurnitureInventory.findMany({ where: { furnitureId: fromFurnitureId } });
+  for (const source of sourceRows) {
+    await tx.userFurnitureInventory.upsert({
+      where: { userId_furnitureId: { userId: source.userId, furnitureId: toFurnitureId } },
+      create: { userId: source.userId, furnitureId: toFurnitureId, quantity: source.quantity },
+      update: { quantity: { increment: source.quantity } },
+    });
+  }
+  await tx.userFurnitureInventory.deleteMany({ where: { furnitureId: fromFurnitureId } });
 }
