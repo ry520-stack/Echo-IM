@@ -66,8 +66,8 @@ export default function SpacesHub({ onOpenAlbum }: Props) {
   const [active, setActive] = useState<SpaceType>('couple');
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-[#f7f6fb] dark:bg-gray-950">
-      <div className="shrink-0 px-4 pt-3">
+    <div className="h-full overflow-y-auto bg-[#f7f6fb] dark:bg-gray-950">
+      <div className="px-4 pt-3">
         <div className="rounded-[26px] bg-white p-1.5 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
           <div className="grid grid-cols-3 gap-1.5">
             {(Object.keys(CONFIG) as SpaceType[]).map(type => {
@@ -98,9 +98,7 @@ export default function SpacesHub({ onOpenAlbum }: Props) {
       </div>
 
       {active === 'couple' ? (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <RelationshipSpaceContent onOpenAlbum={onOpenAlbum} />
-        </div>
+        <RelationshipSpaceContent onOpenAlbum={onOpenAlbum} />
       ) : (
         <LocalSpace key={active} type={active} />
       )}

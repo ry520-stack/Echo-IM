@@ -401,7 +401,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
       {/* ═══ 上下文菜单（锚定卡片 + 边界检测 + 毛玻璃）═══ */}
       {contextMenu && (() => {
         const { cardRect } = contextMenu;
-        const menuH = 120;
+        const menuH = 96;
         const menuW = 160;
         // 优先在卡片下方弹出，空间不足则弹到上方
         const spaceBelow = window.innerHeight - cardRect.bottom;
@@ -417,10 +417,6 @@ export default function ConversationList({ searchText, searchTab }: { searchText
               className="absolute rounded-2xl border border-white/20 bg-white/60 backdrop-blur-xl shadow-2xl py-1.5 overflow-hidden dark:border-gray-600/30 dark:bg-gray-800/60 dark:backdrop-blur-xl"
               style={{ left, top, minWidth: menuW, backdropFilter: 'blur(20px) saturate(1.8)', WebkitBackdropFilter: 'blur(20px) saturate(1.8)' }}
             >
-              <button onClick={(e) => { e.stopPropagation(); const peer = conversations.find(c => c.peer.id === contextMenu.id)?.peer; if (peer) { const key = 'echo-favorites'; const favs = JSON.parse(localStorage.getItem(key) || '[]'); if (!favs.find((f: any) => f.id === peer.id)) { favs.unshift({ id: peer.id, peerId: peer.id, peerName: peer.nickname || peer.username, peerAvatar: peer.avatar, peerDigitalId: peer.digitalId, addedAt: new Date().toISOString() }); localStorage.setItem(key, JSON.stringify(favs)); window.dispatchEvent(new Event('gravity-updated')); } } setContextMenu(null); }}
-                className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-amber-500 hover:bg-white/50 dark:hover:bg-white/10 transition-colors">
-                <span>✦</span> Add to Gravity
-              </button>
               <button onClick={(e) => { e.stopPropagation(); togglePin(contextMenu.id); setContextMenu(null); }}
                 className="flex w-full items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-white/50 dark:text-gray-300 dark:hover:bg-white/10 transition-colors">
                 {pinned.has(contextMenu.id) ? '取消置顶' : '置顶'}

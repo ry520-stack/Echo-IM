@@ -76,6 +76,8 @@ interface AlbumPhoto {
   width: number;
   height: number;
   description: string;
+  type?: 'image' | 'video' | string;
+  size?: number;
 }
 
 interface AlbumGroup {
@@ -107,6 +109,19 @@ function albumPreviewSrc(photo?: AlbumPhoto | null) {
 
 function albumOriginalSrc(photo?: AlbumPhoto | null) {
   return assetUrl(photo?.originalUrl || photo?.url || photo?.previewUrl || photo?.thumbUrl || '');
+}
+
+function isAlbumVideo(photo?: AlbumPhoto | null) {
+  const src = (photo?.originalUrl || photo?.url || photo?.previewUrl || '').split('?')[0] || '';
+  return photo?.type === 'video' || /\.(mp4|webm|mov|m4v)$/i.test(src);
+}
+
+function AlbumMedia({ photo, className, original = false }: { photo: AlbumPhoto; className: string; original?: boolean }) {
+  const src = original ? albumOriginalSrc(photo) : albumPreviewSrc(photo);
+  if (isAlbumVideo(photo)) {
+    return <video src={src} className={className} muted playsInline controls={original} preload="metadata" />;
+  }
+  return <img src={src} className={className} draggable={false} loading="lazy" decoding="async" />;
 }
 
 const WEATHER_CACHE_KEY = 'echo-weather-cache-v1';
@@ -559,7 +574,7 @@ export default function RelationshipSpaceContent({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#f6f5fb] px-4 pb-7 pt-4 dark:bg-gray-950">
+    <div className="min-h-full bg-[#f6f5fb] px-4 pb-7 pt-4 dark:bg-gray-950">
       <SpaceHeader space={space} onOpenAlbum={onOpenAlbum} now={now} />
       <main className="mt-4 space-y-3">
         <section className="grid grid-cols-2 gap-3">
@@ -814,6 +829,24 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
   };
 
   const uploadAlbumFile = async (file: File): Promise<AlbumPhoto> => {
+    const isVideo = file.type.startsWith('video/');
+    if (isVideo) {
+      const url = await uploadCoupleMedia(file);
+      return {
+        id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        url,
+        originalUrl: url,
+        previewUrl: url,
+        thumbUrl: url,
+        createdAt: new Date().toISOString(),
+        width: 16,
+        height: 9,
+        description,
+        type: 'video',
+        size: file.size,
+      };
+    }
+
     const localUrl = URL.createObjectURL(file);
     const size = await readImageSize(localUrl).finally(() => URL.revokeObjectURL(localUrl));
     const thumbFile = await imageCompression(file, {
@@ -836,6 +869,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
       width: size.width,
       height: size.height,
       description,
+      type: 'image',
+      size: file.size,
     };
   };
 
@@ -863,7 +898,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
   };
 
   const onPickFiles = (files: FileList | null) => {
-    const next = Array.from(files || []).filter(file => file.type.startsWith('image/'));
+    const next = Array.from(files || []).filter(file => file.type.startsWith('image/') || file.type.startsWith('video/'));
     if (!next.length) return;
     setPendingFiles(next);
     setFormOpen(true);
@@ -891,7 +926,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
           photos.push(await uploadAlbumFile(file));
         } else {
           const url = await fileToDataUrl(file);
-          const size = await readImageSize(url);
+          const isVideo = file.type.startsWith('video/');
+          const size = isVideo ? { width: 16, height: 9 } : await readImageSize(url);
           photos.push({
             id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
             url,
@@ -899,6 +935,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
             width: size.width,
             height: size.height,
             description,
+            type: isVideo ? 'video' : 'image',
+            size: file.size,
           });
         }
       }
@@ -1030,7 +1068,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
 
   return (
     <div className="h-full overflow-y-auto bg-[#f6f5fb] px-4 pb-7 pt-4 dark:bg-gray-950">
-      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => onPickFiles(e.target.files)} />
+      <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => onPickFiles(e.target.files)} />
       <header className="flex items-center justify-between">
         <button onClick={activeGroup ? () => { setSelectedGroupId(''); setManaging(false); } : onBack} className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-700 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:text-gray-200 dark:ring-white/[0.05]">
           <ChevronLeft size={20} />
@@ -1092,7 +1130,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
                   onContextMenu={(e) => { e.preventDefault(); setManaging(true); togglePhoto(photo.id); }}
                   className="relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-[22px] bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]"
                 >
-                  <img src={albumPreviewSrc(photo)} className="w-full object-cover" draggable={false} loading="lazy" decoding="async" />
+                  <AlbumMedia photo={photo} className="w-full object-cover" />
                   {managing && <span className={`absolute right-2 top-2 h-6 w-6 rounded-full border-2 ${selectedPhotoIds.has(photo.id) ? 'border-rose-500 bg-rose-500' : 'border-white bg-black/20'}`} />}
                 </button>
               ))}
@@ -1114,8 +1152,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
               </div>
               {group.description && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{group.description}</p>}
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {group.photos.slice(0, 8).map(photo => (
-                  <img key={photo.id} src={albumPreviewSrc(photo)} className="h-40 w-32 shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
+                {group.photos.map(photo => (
+                  <AlbumMedia key={photo.id} photo={photo} className="h-40 w-32 shrink-0 rounded-2xl object-cover shadow-sm" />
                 ))}
                 {!group.photos.length && <div className="flex h-36 w-full items-center justify-center rounded-2xl bg-rose-50 text-sm text-rose-300 dark:bg-rose-950/20">还没有照片</div>}
               </div>
@@ -1176,7 +1214,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
         <div className="fixed inset-0 z-[80] bg-black/92 p-4 text-white">
           <button onClick={() => setPreview(null)} className="absolute right-4 top-4 rounded-full bg-white/12 px-3 py-1.5 text-sm">关闭</button>
           <div className="flex h-full items-center justify-center">
-            <img src={albumOriginalSrc(previewPhoto)} className="max-h-[78vh] max-w-full rounded-2xl object-contain" draggable={false} />
+            <AlbumMedia photo={previewPhoto} className="max-h-[78vh] max-w-full rounded-2xl object-contain" original />
           </div>
           <div className="absolute inset-x-4 bottom-8 flex items-center justify-between">
             <button disabled={previewIndex <= 0} onClick={() => preview && setPreview({ groupId: preview.groupId, index: previewIndex - 1 })} className="rounded-full bg-white/12 px-4 py-2 disabled:opacity-30">上一张</button>

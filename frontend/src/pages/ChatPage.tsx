@@ -94,6 +94,9 @@ export default function ChatPage() {
       return;
     }
 
+    setShowChatMobile(true);
+    setSearchError('');
+
     let cancelled = false;
     (async () => {
       try {
@@ -103,7 +106,6 @@ export default function ChatPage() {
         if (peer) {
           setTarget({ type: 'user', peer });
           setSearchError('');
-          setShowChatMobile(true);
           return;
         }
       } catch {
@@ -117,7 +119,6 @@ export default function ChatPage() {
         if (group) {
           setTarget({ type: 'group', group });
           setSearchError('');
-          setShowChatMobile(true);
           return;
         }
       } catch {
@@ -183,7 +184,7 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      {!isChatOpen && (
+      {!isChatOpen && page === 0 && (
         <header className="shrink-0 border-b border-gray-100/60 bg-white/88 backdrop-blur-md dark:border-gray-800/60 dark:bg-gray-900/88">
           <div className="flex h-14 items-center gap-3 px-4">
             <button onClick={() => setDrawerOpen(true)} className="rounded-xl p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">☰</button>

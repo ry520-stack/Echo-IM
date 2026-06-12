@@ -146,6 +146,10 @@ const petStatusMark = (pet: PetBond, action: string) => {
 };
 
 const ERROR_MAP: Record<string, string> = {
+  RELATION_DELETED: '关系已恢复为可聊天，请再发送一次',
+  FRIEND_REQUIRED: '对方暂不接收陌生人消息',
+  FRIEND_PENDING: '好友申请待通过',
+  SELF_MESSAGE: '不能给自己发消息',
   blocked: '对方已将你拉黑，或你已拉黑对方',
   'stranger messages disabled': '对方未开启陌生人消息',
   '消息已发出，但被对方拒收了': '消息已发出，但被对方拒收了',
@@ -321,8 +325,9 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   };
 
   const uploadPetAvatar = async (file: File) => {
+    const uploadFile = await prepareChatImage(file);
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', uploadFile);
     const token = localStorage.getItem('echo-token');
     const res = await fetch(`${getServerUrl()}/api/upload/chat-image`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: fd });
     const data = await res.json();
@@ -1861,10 +1866,11 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <div className="mb-2 flex shrink-0 items-center justify-between">
             <span className="text-xs text-gray-500 dark:text-gray-400">表情包</span>
             <div className="flex items-center gap-2">
-              {emojiManageMode && selectedEmojis.size > 0 && (
+              {emojiManageMode && (
                 <button
                   onClick={async () => {
                     const ids = Array.from(selectedEmojis);
+                    if (!ids.length) return;
                     if (!window.confirm(`删除选中的 ${ids.length} 个表情？`)) return;
                     try {
                       await api('DELETE', '/api/emojis/batch', { ids });
@@ -1875,9 +1881,10 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                       fetchEmojis(true);
                     } catch { toast('删除失败', 'error'); }
                   }}
-                  className="rounded-lg bg-red-500 px-3 py-1 text-xs text-white hover:bg-red-600"
+                  disabled={selectedEmojis.size === 0}
+                  className="rounded-lg bg-red-500 px-3 py-1 text-xs text-white hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-700"
                 >
-                  删除 ({selectedEmojis.size})
+                  {selectedEmojis.size ? `删除 (${selectedEmojis.size})` : '删除'}
                 </button>
               )}
               <button
@@ -1937,7 +1944,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           {emojis.length === 0 ? (
             <span className="text-xs text-gray-400">上传表情包图片...</span>
           ) : (
-            <div className={emojiManageMode && emojiExpanded ? 'flex-1 overflow-y-auto overflow-x-hidden' : 'flex-1 overflow-hidden'}>
+            <div className={emojiManageMode && emojiExpanded ? 'emoji-manage-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1' : 'flex-1 overflow-hidden'}>
               <AnimatePresence initial={false} mode="popLayout">
               <motion.div
                 key={emojiManageMode && emojiExpanded ? 'manage' : `page-${emojiPage}`}
@@ -1948,7 +1955,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 190, damping: 24, mass: 0.9 }}
                 className="grid h-full grid-cols-4 gap-2 overflow-y-auto px-0.5 pb-2"
-                style={{ gridTemplateRows: emojiExpanded ? 'repeat(auto-fill, minmax(56px, 1fr))' : '1fr' }}
+                style={{ gridTemplateRows: emojiManageMode ? 'none' : emojiExpanded ? 'repeat(auto-fill, minmax(72px, 1fr))' : '1fr' }}
               >
                 {(emojiManageMode && emojiExpanded ? emojis : (emojiPages[emojiPage] || [])).map(emoji => {
                   const selected = selectedEmojis.has(emoji.id);
@@ -1990,6 +1997,12 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                             return;
                           }
                           e.preventDefault();
+                          const scroller = e.currentTarget.closest('.emoji-manage-scroll') as HTMLElement | null;
+                          if (scroller) {
+                            const rect = scroller.getBoundingClientRect();
+                            if (e.clientY < rect.top + 48) scroller.scrollTop -= 14;
+                            if (e.clientY > rect.bottom - 48) scroller.scrollTop += 14;
+                          }
                           const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-emoji-id]') as HTMLElement | null;
                           const toId = target?.dataset.emojiId;
                           if (toId && toId !== emojiDragIdRef.current) {
@@ -2017,7 +2030,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           emojiMovedRef.current = false;
                           setEmojiReorderingId(null);
                         }}
-                        className={(emojiManageMode && selected ? `ring-2 ${selectedRing} bg-primary-50 dark:bg-primary-950/20 ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiManageMode && emojiExpanded ? 'touch-none select-none ' : '') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-14 w-14 min-w-[56px] min-h-[56px] cursor-pointer rounded-xl object-contain p-1 transition-all hover:opacity-80'}
+                        className={(emojiManageMode && selected ? `ring-2 ${selectedRing} bg-primary-50 dark:bg-primary-950/20 ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiManageMode && emojiExpanded ? 'touch-none select-none ' : '') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-16 w-16 min-w-[64px] min-h-[64px] cursor-pointer rounded-xl object-contain p-1 transition-all hover:opacity-80'}
                         onClick={() => {
                           if (emojiManageMode && emojiExpanded) return;
                           sendEmojiImage(emoji);
@@ -2033,6 +2046,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
         </div>
       )}
 
+      {!emojiManageMode && (
       <motion.form layout onSubmit={sendMessage} transition={{ type: 'spring', stiffness: 200, damping: 25 }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -2157,6 +2171,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <span className="text-xs">发送</span>
         </button>
       </motion.form>
+      )}
 
       {emojiAction && (
         <div className="fixed inset-0 z-[70]" onClick={() => setEmojiAction(null)}>
