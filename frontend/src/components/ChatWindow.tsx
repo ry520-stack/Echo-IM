@@ -1520,7 +1520,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <button onClick={() => setPetOpen(true)}
             className="shrink-0 rounded-lg p-1.5 text-amber-500 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20"
             title={'\u5171\u540c\u5ba0\u7269'}>
-            {pet?.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-[18px] w-[18px] rounded-md object-cover" /> : <PawPrint size={18} />}
+            {pet?.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-[18px] w-[18px] rounded-md object-cover" loading="lazy" decoding="async" /> : <PawPrint size={18} />}
           </button>
         )}
         {!isGroup && (
@@ -1587,7 +1587,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   <div key={msg.id} className="flex items-end gap-1.5 ml-1 msg-in">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-amber-100 text-sm font-bold text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
                       {pet?.avatar
-                        ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" />
+                        ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
                         : (pet?.name || 'Echo Pet')[0]?.toUpperCase()}
                     </div>
                     <div className="min-w-0 max-w-[80%]">
@@ -2302,7 +2302,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
               <>
             <div className="flex items-center gap-3">
               <label className={`flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${petStage(pet.level).color} text-white shadow-lg ${petStage(pet.level).glow}`}>
-                {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" /> : <Camera size={20} />}
+                {pet.avatar ? <img src={assetUrl(pet.avatar)} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" /> : <Camera size={20} />}
                 <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadPetAvatar(e.target.files[0]).catch(err => toast(err.message, 'error'))} />
               </label>
               <div className="min-w-0 flex-1">

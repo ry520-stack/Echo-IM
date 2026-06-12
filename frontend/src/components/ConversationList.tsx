@@ -110,6 +110,7 @@ export default function ConversationList({ searchText, searchTab }: { searchText
 
   const handleTouchStart = (e: React.TouchEvent, peerId: string) => {
     touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, time: Date.now() };
+    swipeXRef.current = 0;
     // 同步作用域内提前获取卡片 DOM（React 合成事件在 setTimeout 中已失效）
     const cardNode = (e.currentTarget as HTMLElement).closest('[data-conv-card]') as HTMLElement;
     if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -132,9 +133,20 @@ export default function ConversationList({ searchText, searchTab }: { searchText
     }
   };
 
-  const handleTouchEnd = (_e: React.TouchEvent, peerId: string) => {
+  const openConversation = (conv: Conversation) => {
+    setConversations(prev => prev.map(c => c.peer.id === conv.peer.id ? { ...c, unreadCount: 0 } : c));
+    nav(`/chat/${conv.peer.id}`);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent, conv: Conversation) => {
     if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
-    if (swipeXRef.current > 100) togglePin(peerId);
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+    const wasSwipe = swipeXRef.current > 10 || Math.abs(dx) > 10 || dy > 10;
+    if (swipeXRef.current > 100) togglePin(conv.peer.id);
+    if (!wasSwipe && !longPressJustFired.current && !contextMenu) {
+      openConversation(conv);
+    }
     swipeXRef.current = 0; setSwipeId(null); setSwipeX(0);
   };
 
@@ -349,14 +361,11 @@ export default function ConversationList({ searchText, searchTab }: { searchText
                       onClick={() => {
                         if (longPressJustFired.current) { longPressJustFired.current = false; return; }
                         if (contextMenu) { setContextMenu(null); return; }
-                        if (Math.abs(swipeXRef.current) < 5) {
-                          setConversations(prev => prev.map(c => c.peer.id === conv.peer.id ? { ...c, unreadCount: 0 } : c));
-                          nav(`/chat/${conv.peer.id}`);
-                        }
+                        if (Math.abs(swipeXRef.current) < 5) openConversation(conv);
                       }}
                       onTouchStart={(e) => handleTouchStart(e, conv.peer.id)}
                       onTouchMove={(e) => handleTouchMove(e, conv.peer.id)}
-                      onTouchEnd={(e) => handleTouchEnd(e, conv.peer.id)}
+                      onTouchEnd={(e) => handleTouchEnd(e, conv)}
                       onTouchCancel={handleTouchCancel}
                       style={{ touchAction: 'pan-y', ...(isSwiping ? { transform: `translateX(${swipeX}px)`, transition: 'none' } : { transform: 'translateX(0)', transition: 'transform 0.3s ease' }) }}
                   className={`relative flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors select-none ${hasBg ? `backdrop-blur-md ${isActive ? 'bg-white/70 dark:bg-white/10' : 'bg-white/40 hover:bg-white/60 dark:bg-white/5 dark:hover:bg-white/10'} border-b border-white/10 dark:border-white/5` : `hover:bg-gray-100 dark:hover:bg-gray-800/50 ${isActive ? 'bg-primary-50 dark:bg-primary-900/20' : ''}`} ${isPinned ? `border-l-2 ${accentBorderClass[accentColor] || accentBorderClass.purple}` : ''}`}

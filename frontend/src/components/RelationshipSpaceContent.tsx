@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import imageCompression from 'browser-image-compression';
 import {
   AlarmClock,
   Camera,
@@ -68,6 +69,9 @@ interface Weather {
 interface AlbumPhoto {
   id: string;
   url: string;
+  originalUrl?: string;
+  previewUrl?: string;
+  thumbUrl?: string;
   createdAt: string;
   width: number;
   height: number;
@@ -97,6 +101,14 @@ const ALBUM_TITLES: Record<AlbumType, string> = {
   friends: '朋友相册',
   family: '家庭相册',
 };
+function albumPreviewSrc(photo?: AlbumPhoto | null) {
+  return assetUrl(photo?.thumbUrl || photo?.previewUrl || photo?.url || '');
+}
+
+function albumOriginalSrc(photo?: AlbumPhoto | null) {
+  return assetUrl(photo?.originalUrl || photo?.url || photo?.previewUrl || photo?.thumbUrl || '');
+}
+
 const WEATHER_CACHE_KEY = 'echo-weather-cache-v1';
 const DEFAULT_PEER_CITY = '曲阜';
 const CITY_COORDS: Record<string, { lat: number; lon: number; city: string }> = {
@@ -787,9 +799,9 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
     saveAlbumGroups(albumType, next);
   };
 
-  const uploadAlbumFile = async (file: File): Promise<AlbumPhoto> => {
+  const uploadAlbumBlob = async (file: Blob, name: string): Promise<string> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file, name);
     const token = localStorage.getItem('echo-token');
     const res = await fetch(`${getServerUrl()}/api/upload/chat-image`, {
       method: 'POST',
@@ -798,10 +810,28 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || '上传失败');
-    const size = await readImageSize(assetUrl(data.url));
+    return data.url;
+  };
+
+  const uploadAlbumFile = async (file: File): Promise<AlbumPhoto> => {
+    const localUrl = URL.createObjectURL(file);
+    const size = await readImageSize(localUrl).finally(() => URL.revokeObjectURL(localUrl));
+    const thumbFile = await imageCompression(file, {
+      maxWidthOrHeight: 640,
+      maxSizeMB: 0.18,
+      useWebWorker: true,
+      initialQuality: 0.72,
+    });
+    const [url, thumbUrl] = await Promise.all([
+      uploadAlbumBlob(file, file.name),
+      uploadAlbumBlob(thumbFile, `thumb-${file.name.replace(/\.[^.]+$/, '')}.jpg`),
+    ]);
     return {
       id: `photo_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      url: data.url,
+      url,
+      originalUrl: url,
+      previewUrl: thumbUrl,
+      thumbUrl,
       createdAt: new Date().toISOString(),
       width: size.width,
       height: size.height,
@@ -1050,7 +1080,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
                   onContextMenu={(e) => { e.preventDefault(); setManaging(true); togglePhoto(photo.id); }}
                   className="relative mb-3 block w-full break-inside-avoid overflow-hidden rounded-[22px] bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]"
                 >
-                  <img src={photo.url} className="w-full object-cover" draggable={false} loading="lazy" decoding="async" />
+                  <img src={albumPreviewSrc(photo)} className="w-full object-cover" draggable={false} loading="lazy" decoding="async" />
                   {managing && <span className={`absolute right-2 top-2 h-6 w-6 rounded-full border-2 ${selectedPhotoIds.has(photo.id) ? 'border-rose-500 bg-rose-500' : 'border-white bg-black/20'}`} />}
                 </button>
               ))}
@@ -1072,8 +1102,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
               </div>
               {group.description && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{group.description}</p>}
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {group.photos.slice(0, 4).map(photo => (
-                  <img key={photo.id} src={photo.url} className="h-44 w-36 shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
+                {group.photos.slice(0, 1).map(photo => (
+                  <img key={photo.id} src={albumPreviewSrc(photo)} className="h-44 w-full shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
                 ))}
                 {!group.photos.length && <div className="flex h-36 w-full items-center justify-center rounded-2xl bg-rose-50 text-sm text-rose-300 dark:bg-rose-950/20">还没有照片</div>}
               </div>
@@ -1134,7 +1164,7 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
         <div className="fixed inset-0 z-[80] bg-black/92 p-4 text-white">
           <button onClick={() => setPreview(null)} className="absolute right-4 top-4 rounded-full bg-white/12 px-3 py-1.5 text-sm">关闭</button>
           <div className="flex h-full items-center justify-center">
-            <img src={previewPhoto.url} className="max-h-[78vh] max-w-full rounded-2xl object-contain" draggable={false} />
+            <img src={albumOriginalSrc(previewPhoto)} className="max-h-[78vh] max-w-full rounded-2xl object-contain" draggable={false} />
           </div>
           <div className="absolute inset-x-4 bottom-8 flex items-center justify-between">
             <button disabled={previewIndex <= 0} onClick={() => preview && setPreview({ groupId: preview.groupId, index: previewIndex - 1 })} className="rounded-full bg-white/12 px-4 py-2 disabled:opacity-30">上一张</button>
