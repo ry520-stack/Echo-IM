@@ -9,5 +9,6 @@ router.post('/init', leisureHomeController.initHome);
 router.get('/layout', leisureHomeController.getLayout);
 router.post('/layout/save', leisureHomeController.saveLayout);
 router.post('/clean', leisureHomeController.cleanHome);
+router.post('/upgrade', leisureHomeController.upgradeHome);
 
 export default router;

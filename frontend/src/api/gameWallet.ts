@@ -28,3 +28,7 @@ export function getGameWallet() {
 export function getGameTransactions(limit = 50) {
   return api<GameCoinTransaction[]>('GET', `/api/game-wallet/transactions?limit=${limit}`);
 }
+
+export function dailyGameSignin() {
+  return api<{ alreadySigned: boolean; wallet: GameWallet; transaction?: GameCoinTransaction }>('POST', '/api/game-wallet/signin');
+}

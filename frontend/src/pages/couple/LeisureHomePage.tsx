@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Backpack, Brush, ChevronLeft, HeartHandshake, Home, PawPrint, ShoppingBag, Sparkles, SprayCan } from 'lucide-react';
+import { Backpack, Brush, CalendarCheck, ChevronLeft, HeartHandshake, Home, PawPrint, ShoppingBag, Sparkles, SprayCan, TrendingUp } from 'lucide-react';
 import { getFurnitureCatalog, type FurnitureCatalogItem } from '../../api/furniture';
-import { cleanLeisureHome, getLeisureHome, type LeisureHomeBundle } from '../../api/leisureHome';
+import { cleanLeisureHome, getLeisureHome, type LeisureHomeBundle, upgradeLeisureHome } from '../../api/leisureHome';
+import { dailyGameSignin } from '../../api/gameWallet';
 import CoinBar from '../../components/leisure/CoinBar';
 import HomeStatCard from '../../components/leisure/HomeStatCard';
 import RoomCanvas from '../../components/leisure/RoomCanvas';
@@ -47,6 +48,32 @@ export default function LeisureHomePage() {
       toast('小屋已打扫干净', 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : '打扫失败', 'error');
+    }
+  };
+
+  const signin = async () => {
+    try {
+      const next = await dailyGameSignin();
+      setBundle(prev => prev ? { ...prev, myWallet: next.wallet } : prev);
+      toast(next.alreadySigned ? 'TODAY_SIGNED' : 'COIN_PLUS_20', next.alreadySigned ? 'info' : 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'SIGNIN_FAILED', 'error');
+    }
+  };
+
+  const upgrade = async () => {
+    try {
+      const next = await upgradeLeisureHome();
+      setBundle(prev => prev ? {
+        ...prev,
+        home: next.home,
+        myWallet: next.wallet,
+        placementLimit: next.placementLimit,
+        nextUpgradeRule: next.nextUpgradeRule,
+      } : prev);
+      toast('HOME_UPGRADED', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'UPGRADE_FAILED', 'error');
     }
   };
 
@@ -108,6 +135,21 @@ export default function LeisureHomePage() {
         <QuickButton icon={<ShoppingBag size={20} />} label="商城" onClick={() => nav('/couple/leisure-home/shop')} />
         <QuickButton icon={<Backpack size={20} />} label="背包" onClick={() => nav('/couple/leisure-home/inventory')} />
         <QuickButton icon={<SprayCan size={20} />} label="打扫" onClick={clean} />
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-3">
+        <button onClick={signin} className="rounded-[24px] bg-white p-4 text-left shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.06]">
+          <CalendarCheck className="text-amber-500" size={22} />
+          <p className="mt-3 text-sm font-black text-gray-950 dark:text-gray-50">Daily check-in</p>
+          <p className="mt-1 text-xs text-gray-500">+20 coins</p>
+        </button>
+        <button onClick={upgrade} className="rounded-[24px] bg-gray-950 p-4 text-left text-white shadow-sm shadow-gray-900/10 dark:bg-white dark:text-gray-950">
+          <TrendingUp className="text-rose-300 dark:text-rose-500" size={22} />
+          <p className="mt-3 text-sm font-black">Upgrade home</p>
+          <p className="mt-1 text-xs opacity-70">
+            {bundle.nextUpgradeRule ? `${bundle.nextUpgradeRule.cost} coins · ${bundle.nextUpgradeRule.comfort} comfort` : 'Max level'}
+          </p>
+        </button>
       </section>
 
       <section className="mt-4 rounded-[26px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.06]">

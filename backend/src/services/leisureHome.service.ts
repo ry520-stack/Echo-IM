@@ -2,7 +2,7 @@ import { z } from 'zod';
 import prisma from '../utils/prisma';
 import { requireActiveCouple } from './coupleAccess.service';
 import { ensureLeisureSeedData } from './leisureSeed.service';
-import { ensureWallet } from './gameWallet.service';
+import { changeCoinsInTx, ensureWallet } from './gameWallet.service';
 
 export const ROOM_WIDTH = 12;
 export const ROOM_HEIGHT = 8;
@@ -13,6 +13,13 @@ const LEVEL_LIMITS: Record<number, number> = {
   3: 35,
   4: 50,
   5: 70,
+};
+
+const LEVEL_UP_RULES: Record<number, { cost: number; comfort: number; furniture: number }> = {
+  1: { cost: 120, comfort: 20, furniture: 2 },
+  2: { cost: 320, comfort: 90, furniture: 6 },
+  3: { cost: 760, comfort: 220, furniture: 12 },
+  4: { cost: 1400, comfort: 480, furniture: 24 },
 };
 
 const layoutItemSchema = z.object({
@@ -70,7 +77,12 @@ async function loadHomeBundle(userId: string) {
 }
 
 export async function getHome(userId: string) {
-  return loadHomeBundle(userId);
+  const bundle = await loadHomeBundle(userId);
+  return { ...bundle, nextUpgradeRule: getNextUpgradeRule(bundle.home.level) };
+}
+
+export function getNextUpgradeRule(level: number) {
+  return LEVEL_UP_RULES[Math.min(Math.max(level, 1), 5)] || null;
 }
 
 export async function cleanHome(userId: string) {
@@ -80,6 +92,46 @@ export async function cleanHome(userId: string) {
     data: { cleanliness: 100 },
   });
   return { home: updated };
+}
+
+export async function upgradeHome(userId: string) {
+  const { bond, home } = await ensureHome(userId);
+  const currentLevel = Math.min(Math.max(Number(home.level || 1), 1), 5);
+  if (currentLevel >= 5) throw new Error('HOME_MAX_LEVEL');
+
+  const rule = LEVEL_UP_RULES[currentLevel];
+  const placedCount = await (prisma as any).homePlacedFurniture.count({ where: { homeId: home.id } });
+  if (Number(home.comfortScore || 0) < rule.comfort) {
+    throw new Error(`COMFORT_REQUIRED_${rule.comfort}`);
+  }
+  if (placedCount < rule.furniture) {
+    throw new Error(`FURNITURE_REQUIRED_${rule.furniture}`);
+  }
+
+  return prisma.$transaction(async tx => {
+    const wallet = await changeCoinsInTx(tx, {
+      userId,
+      coupleId: bond.id,
+      amount: -rule.cost,
+      type: 'home_upgrade_expense',
+      source: 'leisure-home',
+      description: `home upgrade lv.${currentLevel + 1}`,
+      refType: 'CoupleLeisureHome',
+      refId: home.id,
+    });
+
+    const updatedHome = await (tx as any).coupleLeisureHome.update({
+      where: { id: home.id },
+      data: { level: currentLevel + 1 },
+    });
+
+    return {
+      home: updatedHome,
+      wallet,
+      placementLimit: placementLimit(updatedHome.level),
+      nextUpgradeRule: getNextUpgradeRule(updatedHome.level),
+    };
+  });
 }
 
 export async function saveLayout(userId: string, raw: unknown) {

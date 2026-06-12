@@ -41,3 +41,11 @@ export async function cleanHome(req: Request, res: Response) {
     res.status(400).json({ error: e.message });
   }
 }
+
+export async function upgradeHome(req: Request, res: Response) {
+  try {
+    res.json(await leisureHomeService.upgradeHome(req.userId));
+  } catch (e: any) {
+    res.status(400).json({ error: e.message });
+  }
+}

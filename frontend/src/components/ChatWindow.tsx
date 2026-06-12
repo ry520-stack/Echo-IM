@@ -418,6 +418,12 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     localStorage.setItem('echo-emoji-order', JSON.stringify(next.map(e => e.id)));
   };
 
+  const persistEmojiOrder = (next: { id: string; imageUrl: string; name: string }[]) => {
+    emojisRef.current = next;
+    localStorage.setItem('echo-emoji-order', JSON.stringify(next.map(e => e.id)));
+    api('PUT', '/api/emojis/order', { ids: next.map(item => item.id) }).catch(() => {});
+  };
+
   const moveEmojiById = (fromId: string, toId: string) => {
     if (fromId === toId) return;
     setEmojis(prev => {
@@ -427,8 +433,19 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
-      emojisRef.current = next;
-      localStorage.setItem('echo-emoji-order', JSON.stringify(next.map(e => e.id)));
+      persistEmojiOrder(next);
+      return next;
+    });
+  };
+
+  const moveSelectedEmojis = (position: 'top' | 'bottom') => {
+    const selectedIds = selectedEmojis;
+    if (!selectedIds.size) return;
+    setEmojis(prev => {
+      const selected = prev.filter(item => selectedIds.has(item.id));
+      const rest = prev.filter(item => !selectedIds.has(item.id));
+      const next = position === 'top' ? [...selected, ...rest] : [...rest, ...selected];
+      persistEmojiOrder(next);
       return next;
     });
   };
@@ -1342,7 +1359,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     const atStart = emojiPage === 0 && dx > 0;
     const atEnd = emojiPage === emojiMaxPage && dx < 0;
     e.preventDefault();
-    setEmojiDragX((atStart || atEnd) ? dx * 0.18 : dx * 0.68);
+    setEmojiDragX((atStart || atEnd) ? dx * 0.22 : dx * 0.82);
   };
 
   const handleEmojiTouchEnd = (e: React.TouchEvent) => {
@@ -1353,7 +1370,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
     emojiSwipeRef.current.active = false;
     setEmojiDragging(false);
     setEmojiDragX(0);
-    if (Math.abs(dx) < 68 || Math.abs(dx) < dy) return;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < dy) return;
     const direction = dx < 0 ? 1 : -1;
     setEmojiPageDirection(direction);
     setEmojiPage(page => Math.max(0, Math.min(emojiMaxPage, page + direction)));
@@ -1857,16 +1874,31 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
       {activePanel === 'emoji' && (
         <div
           className="border-t border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-800 dark:bg-gray-900"
-          style={{ height: emojiExpanded ? '280px' : '128px', display: 'flex', flexDirection: 'column' }}
+          style={{ height: emojiManageMode ? 'min(72vh, 560px)' : emojiExpanded ? '280px' : '128px', display: 'flex', flexDirection: 'column' }}
           onTouchStart={handleEmojiTouchStart}
           onTouchMove={handleEmojiTouchMove}
           onTouchEnd={handleEmojiTouchEnd}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="mb-2 flex shrink-0 items-center justify-between">
-            <span className="text-xs text-gray-500 dark:text-gray-400">表情包</span>
-            <div className="flex items-center gap-2">
+          <div className="mb-2 flex shrink-0 items-start justify-between gap-2">
+            <span className="pt-1 text-xs text-gray-500 dark:text-gray-400">表情包</span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {emojiManageMode && (
+                <>
+                <button
+                  onClick={() => moveSelectedEmojis('top')}
+                  disabled={selectedEmojis.size === 0}
+                  className="rounded-lg bg-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-300 disabled:text-gray-400 disabled:opacity-60 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  置顶
+                </button>
+                <button
+                  onClick={() => moveSelectedEmojis('bottom')}
+                  disabled={selectedEmojis.size === 0}
+                  className="rounded-lg bg-gray-200 px-3 py-1 text-xs text-gray-700 hover:bg-gray-300 disabled:text-gray-400 disabled:opacity-60 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  置底
+                </button>
                 <button
                   onClick={async () => {
                     const ids = Array.from(selectedEmojis);
@@ -1886,6 +1918,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                 >
                   {selectedEmojis.size ? `删除 (${selectedEmojis.size})` : '删除'}
                 </button>
+                </>
               )}
               <button
                 onClick={() => {
@@ -1943,18 +1976,97 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           </div>
           {emojis.length === 0 ? (
             <span className="text-xs text-gray-400">上传表情包图片...</span>
+          ) : emojiManageMode && emojiExpanded ? (
+            <div className="emoji-manage-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1">
+              <div className="grid grid-cols-4 gap-3 px-0.5 pb-20">
+                {emojis.map(emoji => {
+                  const selected = selectedEmojis.has(emoji.id);
+                  return (
+                    <div key={emoji.id} className="relative flex items-center justify-center" data-emoji-id={emoji.id}>
+                      <img
+                        src={assetUrl(emoji.imageUrl)}
+                        alt=""
+                        draggable={false}
+                        loading="lazy"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onDragStart={(e) => e.preventDefault()}
+                        onPointerDown={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          const target = e.currentTarget;
+                          const pointerId = e.pointerId;
+                          try { target.setPointerCapture?.(pointerId); } catch {}
+                          emojiPointerStartRef.current = { x: e.clientX, y: e.clientY };
+                          emojiMovedRef.current = false;
+                          if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                          emojiLongPressRef.current = setTimeout(() => {
+                            emojiDragIdRef.current = emoji.id;
+                            setEmojiReorderingId(emoji.id);
+                            navigator.vibrate?.(20);
+                          }, 450);
+                        }}
+                        onPointerMove={(e) => {
+                          e.stopPropagation();
+                          if (!emojiDragIdRef.current) {
+                            const dx = Math.abs(e.clientX - emojiPointerStartRef.current.x);
+                            const dy = Math.abs(e.clientY - emojiPointerStartRef.current.y);
+                            if ((dx > 8 || dy > 8) && emojiLongPressRef.current) {
+                              clearTimeout(emojiLongPressRef.current);
+                              emojiLongPressRef.current = null;
+                            }
+                            return;
+                          }
+                          e.preventDefault();
+                          const scroller = e.currentTarget.closest('.emoji-manage-scroll') as HTMLElement | null;
+                          if (scroller) {
+                            const rect = scroller.getBoundingClientRect();
+                            if (e.clientY < rect.top + 56) scroller.scrollTop -= 18;
+                            if (e.clientY > rect.bottom - 56) scroller.scrollTop += 18;
+                          }
+                          const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-emoji-id]') as HTMLElement | null;
+                          const toId = target?.dataset.emojiId;
+                          if (toId && toId !== emojiDragIdRef.current) {
+                            moveEmojiById(emojiDragIdRef.current, toId);
+                            emojiMovedRef.current = true;
+                          }
+                        }}
+                        onPointerUp={(e) => {
+                          e.stopPropagation();
+                          if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                          emojiLongPressRef.current = null;
+                          try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch {}
+                          if (!emojiMovedRef.current) toggleEmojiSelected(emoji.id);
+                          if (emojiMovedRef.current) persistEmojiOrder(emojisRef.current);
+                          emojiDragIdRef.current = null;
+                          emojiMovedRef.current = false;
+                          setEmojiReorderingId(null);
+                        }}
+                        onPointerCancel={() => {
+                          if (emojiLongPressRef.current) clearTimeout(emojiLongPressRef.current);
+                          emojiLongPressRef.current = null;
+                          emojiDragIdRef.current = null;
+                          emojiMovedRef.current = false;
+                          setEmojiReorderingId(null);
+                        }}
+                        className={(selected ? `ring-2 ${selectedRing} bg-primary-50 dark:bg-primary-950/20 ` : emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-16 w-16 min-w-[64px] min-h-[64px] touch-none select-none cursor-pointer rounded-xl object-contain p-1 transition-all hover:opacity-80'}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           ) : (
             <div className={emojiManageMode && emojiExpanded ? 'emoji-manage-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain pr-1' : 'flex-1 overflow-hidden'}>
               <AnimatePresence initial={false} mode="popLayout">
               <motion.div
-                key={emojiManageMode && emojiExpanded ? 'manage' : `page-${emojiPage}`}
+                key={`page-${emojiPage}`}
                 initial={{ x: emojiPageDirection * 72, opacity: 0.72 }}
                 animate={{ x: emojiDragging ? emojiDragX : 0, opacity: 1 }}
                 exit={{ x: emojiPageDirection * -72, opacity: 0.72 }}
                 transition={emojiDragging
                   ? { duration: 0 }
-                  : { type: 'spring', stiffness: 190, damping: 24, mass: 0.9 }}
-                className="grid h-full grid-cols-4 gap-2 overflow-y-auto px-0.5 pb-2"
+                  : { type: 'spring', stiffness: 135, damping: 19, mass: 0.95 }}
+                className={emojiManageMode && emojiExpanded ? 'grid grid-cols-4 gap-3 px-0.5 pb-20' : 'grid h-full grid-cols-4 gap-2 overflow-y-auto px-0.5 pb-2'}
                 style={{ gridTemplateRows: emojiManageMode ? 'none' : emojiExpanded ? 'repeat(auto-fill, minmax(72px, 1fr))' : '1fr' }}
               >
                 {(emojiManageMode && emojiExpanded ? emojis : (emojiPages[emojiPage] || [])).map(emoji => {

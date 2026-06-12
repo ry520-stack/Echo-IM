@@ -34,6 +34,7 @@ export interface LeisureHomeBundle {
   placementLimit: number;
   myWallet: GameWallet;
   peerWallet: GameWallet;
+  nextUpgradeRule?: { cost: number; comfort: number; furniture: number } | null;
   peer?: { id: string; username: string; nickname: string; avatar: string; digitalId: number } | null;
   pet?: { id: string; name: string; level: number; mood?: string; activity?: string; avatar?: string } | null;
 }
@@ -52,4 +53,8 @@ export function saveLeisureLayout(items: PlacedFurniture[]) {
 
 export function cleanLeisureHome() {
   return api<{ home: LeisureHome }>('POST', '/api/leisure-home/clean');
+}
+
+export function upgradeLeisureHome() {
+  return api<{ home: LeisureHome; wallet: GameWallet; placementLimit: number; nextUpgradeRule?: { cost: number; comfort: number; furniture: number } | null }>('POST', '/api/leisure-home/upgrade');
 }
