@@ -1062,6 +1062,18 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
       {activeGroup ? (
         <section className="mt-4 space-y-4">
           <GroupEditor group={activeGroup} onChange={(patch) => updateGroup(activeGroup.id, patch)} />
+          <div className="rounded-[24px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.05]">
+            <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-500">
+              <span className="rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800">{activeGroup.date || '未设置时间'}</span>
+              <span className="rounded-full bg-gray-100 px-3 py-1.5 dark:bg-gray-800">{activeGroup.location || '未设置地点'}</span>
+              <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-500 dark:bg-rose-950/25">{activeGroup.photos.length} 张照片</span>
+            </div>
+            {activeGroup.description ? (
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-600 dark:text-gray-300">{activeGroup.description}</p>
+            ) : (
+              <p className="mt-3 text-sm text-gray-400">还没有备注，可以在上方编辑这段回忆。</p>
+            )}
+          </div>
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-500">{activeGroup.photos.length} 张照片</p>
             <div className="flex gap-2">
@@ -1102,8 +1114,8 @@ export function CoupleAlbumPage({ onBack, initialType = 'couple' }: { onBack?: (
               </div>
               {group.description && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{group.description}</p>}
               <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-                {group.photos.slice(0, 1).map(photo => (
-                  <img key={photo.id} src={albumPreviewSrc(photo)} className="h-44 w-full shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
+                {group.photos.slice(0, 8).map(photo => (
+                  <img key={photo.id} src={albumPreviewSrc(photo)} className="h-40 w-32 shrink-0 rounded-2xl object-cover shadow-sm" draggable={false} loading="lazy" decoding="async" />
                 ))}
                 {!group.photos.length && <div className="flex h-36 w-full items-center justify-center rounded-2xl bg-rose-50 text-sm text-rose-300 dark:bg-rose-950/20">还没有照片</div>}
               </div>

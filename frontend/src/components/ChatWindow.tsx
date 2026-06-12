@@ -459,6 +459,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
   const shootVideoRef = useRef<HTMLInputElement>(null);
   const [showShootMenu, setShowShootMenu] = useState(false);
   const [emojiPreview, setEmojiPreview] = useState<string | null>(null);
+  const [emojiAction, setEmojiAction] = useState<{ url: string; x: number; y: number } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [groupAliases, setGroupAliases] = useState<Record<string, string>>({});
   const [liveGroupName, setLiveGroupName] = useState(groupName || '');
@@ -1703,7 +1704,11 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                             {msg.type === 'emoji' ? (
                               <button
                                 type="button"
-                                onClick={() => collectAsEmoji(msg.content)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  setEmojiAction({ url: msg.content, x: rect.left + rect.width / 2, y: rect.top });
+                                }}
                                 className="rounded-2xl bg-transparent p-0"
                                 title="收藏"
                               >
@@ -1713,7 +1718,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                                   draggable={false}
                                   onContextMenu={(e) => e.preventDefault()}
                                   onDragStart={(e) => e.preventDefault()}
-                                  className="max-h-[150px] max-w-[150px] object-contain"
+                                  className="max-h-[96px] max-w-[96px] object-contain"
                                   loading="lazy"
                                   onLoad={() => setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)}
                                 />
@@ -1860,10 +1865,13 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                 <button
                   onClick={async () => {
                     const ids = Array.from(selectedEmojis);
+                    if (!window.confirm(`删除选中的 ${ids.length} 个表情？`)) return;
                     try {
                       await api('DELETE', '/api/emojis/batch', { ids });
                       toast(`已删除 ${ids.length} 个表情`, 'success');
                       setSelectedEmojis(new Set());
+                      setEmojis(prev => prev.filter(item => !ids.includes(item.id)));
+                      emojisCachedRef.current = false;
                       fetchEmojis(true);
                     } catch { toast('删除失败', 'error'); }
                   }}
@@ -1940,7 +1948,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                   ? { duration: 0 }
                   : { type: 'spring', stiffness: 190, damping: 24, mass: 0.9 }}
                 className="grid h-full grid-cols-4 gap-2 overflow-y-auto px-0.5 pb-2"
-                style={{ gridTemplateRows: emojiExpanded ? 'repeat(auto-fill, minmax(64px, 1fr))' : '1fr' }}
+                style={{ gridTemplateRows: emojiExpanded ? 'repeat(auto-fill, minmax(56px, 1fr))' : '1fr' }}
               >
                 {(emojiManageMode && emojiExpanded ? emojis : (emojiPages[emojiPage] || [])).map(emoji => {
                   const selected = selectedEmojis.has(emoji.id);
@@ -2009,7 +2017,7 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
                           emojiMovedRef.current = false;
                           setEmojiReorderingId(null);
                         }}
-                        className={(emojiManageMode && selected ? `ring-1 ${selectedRing} ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiManageMode && emojiExpanded ? 'touch-none select-none ' : '') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-16 w-16 min-w-[64px] min-h-[64px] cursor-pointer rounded-xl object-contain transition-all hover:opacity-80'}
+                        className={(emojiManageMode && selected ? `ring-2 ${selectedRing} bg-primary-50 dark:bg-primary-950/20 ` : emojiManageMode && emojiManageFlash ? `ring-1 ${selectedRing} animate-pulse ` : 'ring-1 ring-transparent ') + (emojiManageMode && emojiExpanded ? 'touch-none select-none ' : '') + (emojiReorderingId === emoji.id ? 'scale-95 opacity-70 ' : '') + 'h-14 w-14 min-w-[56px] min-h-[56px] cursor-pointer rounded-xl object-contain p-1 transition-all hover:opacity-80'}
                         onClick={() => {
                           if (emojiManageMode && emojiExpanded) return;
                           sendEmojiImage(emoji);
@@ -2149,6 +2157,35 @@ export default function ChatWindow({ peerId, peer, chatType, groupName, groupAva
           <span className="text-xs">发送</span>
         </button>
       </motion.form>
+
+      {emojiAction && (
+        <div className="fixed inset-0 z-[70]" onClick={() => setEmojiAction(null)}>
+          <div
+            className="absolute overflow-hidden rounded-2xl border border-gray-200 bg-white/95 py-1.5 shadow-2xl backdrop-blur-xl dark:border-gray-700 dark:bg-gray-800/95"
+            style={{
+              left: Math.max(12, Math.min(emojiAction.x - 58, window.innerWidth - 132)),
+              top: Math.max(12, Math.min(emojiAction.y - 72, window.innerHeight - 116)),
+            }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                collectAsEmoji(emojiAction.url);
+                setEmojiAction(null);
+              }}
+              className="flex min-w-[116px] items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              收藏
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setEmojiAction(null); }}
+              className="flex min-w-[116px] items-center justify-center px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Message context menu */}
       {msgContextMenu && (() => {
