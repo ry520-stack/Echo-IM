@@ -140,21 +140,21 @@ export default function LeisureHomePage() {
       <section className="mt-4 grid grid-cols-2 gap-3">
         <button onClick={signin} className="rounded-[24px] bg-white p-4 text-left shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.06]">
           <CalendarCheck className="text-amber-500" size={22} />
-          <p className="mt-3 text-sm font-black text-gray-950 dark:text-gray-50">Daily check-in</p>
-          <p className="mt-1 text-xs text-gray-500">+20 coins</p>
+          <p className="mt-3 text-sm font-black text-gray-950 dark:text-gray-50">每日签到</p>
+          <p className="mt-1 text-xs text-gray-500">领取 20 金币</p>
         </button>
         <button onClick={upgrade} className="rounded-[24px] bg-gray-950 p-4 text-left text-white shadow-sm shadow-gray-900/10 dark:bg-white dark:text-gray-950">
           <TrendingUp className="text-rose-300 dark:text-rose-500" size={22} />
-          <p className="mt-3 text-sm font-black">Upgrade home</p>
+          <p className="mt-3 text-sm font-black">升级小屋</p>
           <p className="mt-1 text-xs opacity-70">
-            {bundle.nextUpgradeRule ? `${bundle.nextUpgradeRule.cost} coins · ${bundle.nextUpgradeRule.comfort} comfort` : 'Max level'}
+            {bundle.nextUpgradeRule ? `${bundle.nextUpgradeRule.cost} 金币 · ${bundle.nextUpgradeRule.comfort} 舒适度` : '已满级'}
           </p>
         </button>
       </section>
 
       <section className="mt-4 rounded-[26px] bg-white p-4 shadow-sm ring-1 ring-black/[0.04] dark:bg-gray-900 dark:ring-white/[0.06]">
-        <p className="text-sm font-black text-gray-950 dark:text-gray-50">下一步玩法</p>
-        <p className="mt-2 text-xs leading-5 text-gray-500">做饭、种植、订单、爱情银行、科技树和神秘商店会沿用这个小屋基础继续分阶段接入。</p>
+        <p className="text-sm font-black text-gray-950 dark:text-gray-50">小屋玩法进度</p>
+        <p className="mt-2 text-xs leading-5 text-gray-500">已接入金币、签到、家具商城、背包、装修摆放和小屋升级。做饭、种植、订单、爱情银行、科技树、神秘商店会继续接入到这个小屋里。</p>
       </section>
     </div>
   );

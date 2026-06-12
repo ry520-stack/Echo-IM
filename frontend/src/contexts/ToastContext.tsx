@@ -13,12 +13,26 @@ const ToastContext = createContext<ToastFn | null>(null);
 
 let nextId = 0;
 
+function formatToastMessage(message: string) {
+  if (message === 'TODAY_SIGNED') return '今天已经签到过了';
+  if (message === 'COIN_PLUS_20') return '签到成功，金币 +20';
+  if (message === 'HOME_UPGRADED') return '小屋升级成功';
+  if (message === 'SIGNIN_FAILED') return '签到失败';
+  if (message === 'UPGRADE_FAILED') return '小屋升级失败';
+  if (message === 'HOME_MAX_LEVEL') return '小屋已经满级了';
+  const comfort = message.match(/^COMFORT_REQUIRED_(\d+)$/);
+  if (comfort) return `舒适度需要达到 ${comfort[1]}`;
+  const furniture = message.match(/^FURNITURE_REQUIRED_(\d+)$/);
+  if (furniture) return `需要先摆放 ${furniture[1]} 件家具`;
+  return message;
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = nextId++;
-    setToasts(prev => [...prev, { id, message, type }]);
+    setToasts(prev => [...prev, { id, message: formatToastMessage(message), type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);

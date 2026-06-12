@@ -1,6 +1,11 @@
 import type { FurnitureCatalogItem } from '../../api/furniture';
 import type { PlacedFurniture } from '../../api/leisureHome';
 import { furnitureSymbol } from './FurnitureItem';
+import { assetUrl } from '../../utils/assetUrl';
+
+function roomAsset(url: string) {
+  return url.startsWith('/leisure/') ? url : assetUrl(url);
+}
 
 interface RoomCanvasProps {
   items: PlacedFurniture[];
@@ -14,7 +19,14 @@ export default function RoomCanvas({ items, catalog, editable = false, selectedI
   const catalogMap = new Map(catalog.map(item => [item.id, item]));
   return (
     <div className="relative aspect-[12/8] overflow-hidden rounded-[32px] bg-gradient-to-b from-rose-50 via-orange-50 to-amber-50 p-3 shadow-inner ring-1 ring-black/[0.04]">
-      <div className="absolute inset-x-0 top-0 h-[38%] bg-gradient-to-b from-white/80 to-transparent" />
+      <img
+        src="/leisure/cafe/assets/bg/day/BG_D01.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-45"
+        loading="lazy"
+        draggable={false}
+      />
+      <div className="absolute inset-x-0 top-0 h-[38%] bg-gradient-to-b from-white/70 to-transparent" />
       <div
         className="relative grid h-full w-full rounded-[24px] border border-white/70 bg-white/35"
         style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridTemplateRows: 'repeat(8, minmax(0, 1fr))' }}
@@ -41,7 +53,11 @@ export default function RoomCanvas({ items, catalog, editable = false, selectedI
                 gridRow: `${item.y + 1} / span ${height}`,
               }}
             >
-              {furnitureSymbol(meta)}
+              {meta?.imageUrl ? (
+                <img src={roomAsset(meta.imageUrl)} alt={meta.name} className="h-full w-full object-contain p-0.5" loading="lazy" draggable={false} />
+              ) : (
+                furnitureSymbol(meta)
+              )}
             </button>
           );
         })}
